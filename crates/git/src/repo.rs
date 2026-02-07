@@ -49,38 +49,50 @@ pub enum FileStatus {
 }
 
 /// High-level Git repository wrapper.
+///
+/// Uses a hybrid approach:
+/// - gix for read operations (fast, safe, pure Rust)
+/// - git2 for write operations (mature, proven, well-documented)
 pub struct GitRepository {
     path: PathBuf,
-    repo: gix::Repository,
+    gix_repo: gix::Repository,    // For reading
+    git2_repo: git2::Repository,  // For writing
 }
 
 impl GitRepository {
     /// Opens a Git repository at the specified path.
+    ///
+    /// Opens both gix (for reading) and git2 (for writing) repositories.
     #[instrument(skip(path))]
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, GitError> {
         let path = path.as_ref();
 
-        let repo = gix::discover(path)
+        // Open with gix (for reading)
+        let gix_repo = gix::discover(path)
             .map_err(|e| {
                 if !path.exists() {
                     GitError::RepoNotFound(path.display().to_string())
                 } else {
-                    GitError::InvalidRepo(format!("Failed to open repository: {}", e))
+                    GitError::InvalidRepo(format!("Failed to open repository with gix: {}", e))
                 }
             })?;
 
-        tracing::debug!("Opened repository at {}", path.display());
+        // Open with git2 (for writing)
+        let git2_repo = git2::Repository::open(path)?;
+
+        tracing::debug!("Opened repository (gix + git2) at {}", path.display());
 
         Ok(Self {
             path: path.to_path_buf(),
-            repo,
+            gix_repo,
+            git2_repo,
         })
     }
 
     /// Get the current HEAD reference.
     #[instrument(skip(self))]
     pub fn get_head(&self) -> Result<String, GitError> {
-        let head = self.repo.head()
+        let head = self.gix_repo.head()
             .map_err(|e| GitError::RefNotFound(format!("Failed to get HEAD: {}", e)))?;
 
         let head_name = if head.is_detached() {
@@ -106,7 +118,7 @@ impl GitRepository {
     pub fn get_branches(&self) -> Result<Vec<String>, GitError> {
         let mut branches = Vec::new();
 
-        let references = self.repo.references()
+        let references = self.gix_repo.references()
             .map_err(|e| GitError::OperationFailed(format!("Failed to get references: {}", e)))?;
 
         // Get local branches
@@ -119,7 +131,7 @@ impl GitRepository {
         }
 
         // Get remote branches
-        let references = self.repo.references()
+        let references = self.gix_repo.references()
             .map_err(|e| GitError::OperationFailed(format!("Failed to get references: {}", e)))?;
 
         for r in (references.remote_branches()
@@ -144,7 +156,7 @@ impl GitRepository {
         let summary = StatusSummary::default();
 
         // Try to get basic status using gix-status
-        match self.repo.index() {
+        match self.gix_repo.index() {
             Ok(_index) => {
                 // For now, we'll just return zeros
                 // Full implementation requires walking the working tree
@@ -166,14 +178,14 @@ impl GitRepository {
     /// Get commit history starting from HEAD.
     #[instrument(skip(self))]
     pub fn get_commit_history(&self, limit: Option<usize>) -> Result<Vec<Commit>, GitError> {
-        let head = self.repo.head()
+        let head = self.gix_repo.head()
             .map_err(|e| GitError::RefNotFound(format!("Cannot get HEAD: {}", e)))?;
 
         let head_id = head.id()
             .ok_or_else(|| GitError::OperationFailed("Cannot resolve HEAD".to_string()))?;
 
         let mut commits = Vec::new();
-        let platform = self.repo.rev_walk([head_id]);
+        let platform = self.gix_repo.rev_walk([head_id]);
 
         let commit_iter = platform.all()
             .map_err(|e| GitError::OperationFailed(format!("Failed to walk commits: {}", e)))?;
@@ -182,7 +194,7 @@ impl GitRepository {
             let oid = commit_result
                 .map_err(|e| GitError::OperationFailed(format!("Invalid commit: {}", e)))?;
 
-            let commit_obj = self.repo.find_commit(oid.id)
+            let commit_obj = self.gix_repo.find_commit(oid.id)
                 .map_err(|e| GitError::OperationFailed(format!("Cannot find commit: {}", e)))?;
 
             commits.push(self.parse_commit(&commit_obj)?);
@@ -198,7 +210,7 @@ impl GitRepository {
         let oid = gix::ObjectId::from_hex(hash.as_bytes())
             .map_err(|e| GitError::OperationFailed(format!("Invalid hash: {}", e)))?;
 
-        let commit_obj = self.repo.find_commit(oid)
+        let commit_obj = self.gix_repo.find_commit(oid)
             .map_err(|e| GitError::OperationFailed(format!("Cannot find commit: {}", e)))?;
 
         self.parse_commit(&commit_obj)
@@ -212,7 +224,7 @@ impl GitRepository {
         let oid = gix::ObjectId::from_hex(hash.as_bytes())
             .map_err(|e| GitError::OperationFailed(format!("Invalid hash: {}", e)))?;
 
-        let commit = self.repo.find_commit(oid)
+        let commit = self.gix_repo.find_commit(oid)
             .map_err(|e| GitError::OperationFailed(format!("Cannot find commit: {}", e)))?;
 
         let commit_tree = commit.tree()
@@ -220,7 +232,7 @@ impl GitRepository {
 
         // Get parent tree (or empty tree if this is the root commit)
         let parent_tree = if let Some(parent_id) = commit.parent_ids().next() {
-            let parent = self.repo.find_commit(parent_id)
+            let parent = self.gix_repo.find_commit(parent_id)
                 .map_err(|e| GitError::OperationFailed(format!("Cannot find parent: {}", e)))?;
             Some(parent.tree()
                 .map_err(|e| GitError::OperationFailed(format!("Cannot get parent tree: {}", e)))?)
