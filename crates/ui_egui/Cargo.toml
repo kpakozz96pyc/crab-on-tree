@@ -1,0 +1,23 @@
+[package]
+name = "crabontree"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "crabontree"
+path = "src/main.rs"
+
+[dependencies]
+crabontree-app = { path = "../app" }
+crabontree-ui-core = { path = "../ui_core" }
+
+eframe.workspace = true
+egui.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+rfd.workspace = true
+chrono.workspace = true

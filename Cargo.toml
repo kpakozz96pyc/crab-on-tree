@@ -1,0 +1,47 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/git",
+    "crates/app",
+    "crates/ui_core",
+    "crates/ui_egui",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["CrabOnTree Contributors"]
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.41", features = ["full"] }
+
+# Logging and tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Git operations
+gix = { version = "0.66", features = ["blocking-network-client", "worktree-mutation"] }
+
+# UI framework
+eframe = { version = "0.27", default-features = false, features = ["default_fonts", "glow", "persistence"] }
+egui = "0.27"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+
+# File system
+directories = "5.0"
+rfd = "0.14"
+
+# Date/time
+chrono = "0.4"
+
+# Testing
+tempfile = "3.10"

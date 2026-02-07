@@ -1,0 +1,16 @@
+[package]
+name = "crabontree-app"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+crabontree-git = { path = "../git" }
+
+tokio.workspace = true
+tracing.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+toml.workspace = true
+directories.workspace = true
