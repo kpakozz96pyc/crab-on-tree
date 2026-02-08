@@ -448,14 +448,23 @@ impl CrabOnTreeApp {
                 egui::Frame::none()
                     .fill(egui::Color32::from_rgb(30, 30, 35))
                     .show(ui, |ui| {
-                        egui::ScrollArea::vertical().id_source("pane1_branch_tree_scroll").show(ui, |ui| {
+                        ui.vertical(|ui| {
+                            // Fixed header at top
+                            ui.add_space(5.0);
                             ui.heading("Branches & Tags");
                             ui.separator();
-                            if let Some(tree) = &branch_tree {
-                                self.render_branch_tree_pane(ui, tree);
-                            } else {
-                                ui.label("Loading branches...");
-                            }
+                            ui.add_space(5.0);
+
+                            // Scrollable content below
+                            egui::ScrollArea::vertical()
+                                .id_source("pane1_branch_tree_scroll")
+                                .show(ui, |ui| {
+                                    if let Some(tree) = &branch_tree {
+                                        self.render_branch_tree_pane(ui, tree);
+                                    } else {
+                                        ui.label("Loading branches...");
+                                    }
+                                });
                         });
                     });
             });
@@ -471,14 +480,23 @@ impl CrabOnTreeApp {
                 egui::Frame::none()
                     .fill(egui::Color32::from_rgb(30, 30, 35))
                     .show(ui, |ui| {
-                        egui::ScrollArea::vertical().id_source("pane2_file_tree_scroll").show(ui, |ui| {
+                        ui.vertical(|ui| {
+                            // Fixed header at top
+                            ui.add_space(5.0);
                             ui.heading("File Tree");
                             ui.separator();
-                            if let Some(tree) = &file_tree {
-                                self.render_file_tree_pane(ui, tree);
-                            } else {
-                                ui.label("Loading file tree...");
-                            }
+                            ui.add_space(5.0);
+
+                            // Scrollable content below
+                            egui::ScrollArea::vertical()
+                                .id_source("pane2_file_tree_scroll")
+                                .show(ui, |ui| {
+                                    if let Some(tree) = &file_tree {
+                                        self.render_file_tree_pane(ui, tree);
+                                    } else {
+                                        ui.label("Loading file tree...");
+                                    }
+                                });
                         });
                     });
             });
@@ -494,14 +512,23 @@ impl CrabOnTreeApp {
                 egui::Frame::none()
                     .fill(egui::Color32::from_rgb(30, 30, 35))
                     .show(ui, |ui| {
-                        egui::ScrollArea::vertical().id_source("pane3_changed_files_scroll").show(ui, |ui| {
+                        ui.vertical(|ui| {
+                            // Fixed header at top
+                            ui.add_space(5.0);
                             ui.heading("Changed Files");
                             ui.separator();
-                            if let Some(files) = &changed_files {
-                                self.render_changed_files_pane(ui, files);
-                            } else {
-                                ui.label("Loading changed files...");
-                            }
+                            ui.add_space(5.0);
+
+                            // Scrollable content below
+                            egui::ScrollArea::vertical()
+                                .id_source("pane3_changed_files_scroll")
+                                .show(ui, |ui| {
+                                    if let Some(files) = &changed_files {
+                                        self.render_changed_files_pane(ui, files);
+                                    } else {
+                                        ui.label("Loading changed files...");
+                                    }
+                                });
                         });
                     });
             });
@@ -519,8 +546,19 @@ impl CrabOnTreeApp {
                     egui::Frame::none()
                         .fill(egui::Color32::from_rgb(25, 25, 30))
                         .show(ui, |ui| {
-                            egui::ScrollArea::vertical().id_source("pane4_file_viewer_scroll").show(ui, |ui| {
-                                self.render_file_viewer_pane(ui, &file_view);
+                            ui.vertical(|ui| {
+                                // Fixed header at top
+                                ui.add_space(5.0);
+                                ui.heading("File Viewer");
+                                ui.separator();
+                                ui.add_space(5.0);
+
+                                // Scrollable content below
+                                egui::ScrollArea::vertical()
+                                    .id_source("pane4_file_viewer_scroll")
+                                    .show(ui, |ui| {
+                                        self.render_file_viewer_pane(ui, &file_view);
+                                    });
                             });
                         });
                 },
