@@ -69,4 +69,33 @@ pub enum Job {
 
     /// Load author identity from git config.
     LoadAuthorIdentity(PathBuf),
+
+    // ===== 4-Pane Layout Jobs =====
+
+    /// Load branch tree.
+    LoadBranchTree(PathBuf),
+
+    /// Checkout a branch.
+    CheckoutBranch {
+        repo_path: PathBuf,
+        branch_name: String,
+    },
+
+    /// Load file tree.
+    LoadFileTree(PathBuf),
+
+    /// Load changed files.
+    LoadChangedFiles(PathBuf),
+
+    /// Load file content.
+    LoadFileContent {
+        repo_path: PathBuf,
+        file_path: PathBuf,
+    },
+
+    /// Load file diff.
+    LoadFileDiff {
+        repo_path: PathBuf,
+        file_path: PathBuf,
+    },
 }

@@ -21,4 +21,7 @@ pub use executor::JobExecutor;
 pub use job::{Job, JobId};
 pub use message::AppMessage;
 pub use reducer::reduce;
-pub use state::{AppState, RepoState, StagingProgress};
+pub use state::{
+    AppState, BranchInfo, BranchTreeState, ChangedFilesState, DiffViewMode, FileTreeNode,
+    FileTreeState, FileViewState, LayoutConfig, LayoutMode, RepoState, StagingProgress, TagInfo,
+};

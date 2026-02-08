@@ -27,6 +27,10 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
                 commit_message: String::new(),
                 author_name: String::new(),
                 author_email: String::new(),
+                branch_tree: None,
+                file_tree: None,
+                changed_files: None,
+                file_view: crate::state::FileViewState::default(),
             });
 
             // Add to recent repos and save config
@@ -268,6 +272,244 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
                 repo.author_email = email;
             }
             Effect::None
+        }
+
+        // ===== 4-Pane Layout Handlers =====
+
+        AppMessage::LoadBranchTreeRequested => {
+            state.loading = true;
+            if let Some(repo) = &state.current_repo {
+                Effect::LoadBranchTree(repo.path.clone())
+            } else {
+                tracing::warn!("Cannot load branch tree: no repository open");
+                Effect::None
+            }
+        }
+
+        AppMessage::BranchTreeLoaded(branch_tree) => {
+            state.loading = false;
+            if let Some(repo) = &mut state.current_repo {
+                repo.branch_tree = Some(branch_tree);
+                tracing::info!("Loaded branch tree");
+            }
+            Effect::None
+        }
+
+        AppMessage::BranchSectionToggled(section) => {
+            if let Some(repo) = &mut state.current_repo {
+                if let Some(tree) = &mut repo.branch_tree {
+                    if tree.expanded_sections.contains(&section) {
+                        tree.expanded_sections.remove(&section);
+                    } else {
+                        tree.expanded_sections.insert(section);
+                    }
+                }
+            }
+            Effect::None
+        }
+
+        AppMessage::BranchCheckoutRequested(branch_name) => {
+            if let Some(repo) = &state.current_repo {
+                state.loading = true;
+                Effect::CheckoutBranch {
+                    repo_path: repo.path.clone(),
+                    branch_name,
+                }
+            } else {
+                Effect::None
+            }
+        }
+
+        AppMessage::BranchCheckedOut(branch_name) => {
+            state.loading = false;
+            tracing::info!("Checked out branch: {}", branch_name);
+
+            if let Some(repo) = &state.current_repo {
+                // Refresh all data after checkout
+                Effect::Batch(vec![
+                    Effect::RefreshRepo(repo.path.clone()),
+                    Effect::LoadBranchTree(repo.path.clone()),
+                    Effect::LoadFileTree(repo.path.clone()),
+                    Effect::LoadChangedFiles(repo.path.clone()),
+                    Effect::LoadCommitHistory(repo.path.clone()),
+                ])
+            } else {
+                Effect::None
+            }
+        }
+
+        AppMessage::LoadFileTreeRequested => {
+            state.loading = true;
+            if let Some(repo) = &state.current_repo {
+                Effect::LoadFileTree(repo.path.clone())
+            } else {
+                tracing::warn!("Cannot load file tree: no repository open");
+                Effect::None
+            }
+        }
+
+        AppMessage::FileTreeLoaded(file_tree) => {
+            state.loading = false;
+            if let Some(repo) = &mut state.current_repo {
+                repo.file_tree = Some(file_tree);
+                tracing::info!("Loaded file tree");
+            }
+            Effect::None
+        }
+
+        AppMessage::FileTreeNodeToggled(path) => {
+            if let Some(repo) = &mut state.current_repo {
+                if let Some(tree) = &mut repo.file_tree {
+                    if tree.expanded_paths.contains(&path) {
+                        tree.expanded_paths.remove(&path);
+                    } else {
+                        tree.expanded_paths.insert(path);
+                    }
+                }
+            }
+            Effect::None
+        }
+
+        AppMessage::FileTreeNodeSelected(path) => {
+            if let Some(repo) = &mut state.current_repo {
+                if let Some(tree) = &mut repo.file_tree {
+                    tree.selected_path = Some(path.clone());
+                }
+
+                // Load file content or diff
+                state.loading = true;
+                Effect::LoadFileContent {
+                    repo_path: repo.path.clone(),
+                    file_path: path,
+                }
+            } else {
+                Effect::None
+            }
+        }
+
+        AppMessage::LoadChangedFilesRequested => {
+            state.loading = true;
+            if let Some(repo) = &state.current_repo {
+                Effect::LoadChangedFiles(repo.path.clone())
+            } else {
+                tracing::warn!("Cannot load changed files: no repository open");
+                Effect::None
+            }
+        }
+
+        AppMessage::ChangedFilesLoaded(changed_files) => {
+            state.loading = false;
+            if let Some(repo) = &mut state.current_repo {
+                repo.changed_files = Some(changed_files);
+                tracing::info!("Loaded changed files");
+            }
+            Effect::None
+        }
+
+        AppMessage::ChangedFileSelected(path) => {
+            if let Some(repo) = &mut state.current_repo {
+                if let Some(files) = &mut repo.changed_files {
+                    files.selected_file = Some(path.clone());
+                }
+
+                // Load file diff
+                state.loading = true;
+                Effect::LoadFileDiff {
+                    repo_path: repo.path.clone(),
+                    file_path: path,
+                }
+            } else {
+                Effect::None
+            }
+        }
+
+        AppMessage::FileContentRequested(path) => {
+            if let Some(repo) = &state.current_repo {
+                state.loading = true;
+                Effect::LoadFileContent {
+                    repo_path: repo.path.clone(),
+                    file_path: path,
+                }
+            } else {
+                Effect::None
+            }
+        }
+
+        AppMessage::FileContentLoaded { path, content, language } => {
+            state.loading = false;
+            if let Some(repo) = &mut state.current_repo {
+                repo.file_view = crate::state::FileViewState::Content {
+                    path,
+                    content,
+                    language,
+                };
+            }
+            Effect::None
+        }
+
+        AppMessage::FileDiffRequested(path) => {
+            if let Some(repo) = &state.current_repo {
+                state.loading = true;
+                Effect::LoadFileDiff {
+                    repo_path: repo.path.clone(),
+                    file_path: path,
+                }
+            } else {
+                Effect::None
+            }
+        }
+
+        AppMessage::FileDiffLoaded { path, hunks } => {
+            state.loading = false;
+            if let Some(repo) = &mut state.current_repo {
+                repo.file_view = crate::state::FileViewState::Diff {
+                    path,
+                    hunks,
+                    view_mode: crate::state::DiffViewMode::Unified,
+                };
+            }
+            Effect::None
+        }
+
+        AppMessage::BinaryFileDetected { path, size } => {
+            state.loading = false;
+            if let Some(repo) = &mut state.current_repo {
+                repo.file_view = crate::state::FileViewState::Binary {
+                    path,
+                    size,
+                };
+            }
+            Effect::None
+        }
+
+        AppMessage::DiffViewModeChanged(mode) => {
+            if let Some(repo) = &mut state.current_repo {
+                if let crate::state::FileViewState::Diff { view_mode, .. } = &mut repo.file_view {
+                    *view_mode = mode;
+                }
+            }
+            Effect::None
+        }
+
+        AppMessage::LayoutModeToggled => {
+            state.layout_config.mode = match state.layout_config.mode {
+                crate::state::LayoutMode::Classic => crate::state::LayoutMode::FourPane,
+                crate::state::LayoutMode::FourPane => crate::state::LayoutMode::Classic,
+            };
+
+            // Update config
+            state.config.layout_mode = match state.layout_config.mode {
+                crate::state::LayoutMode::Classic => "classic".to_string(),
+                crate::state::LayoutMode::FourPane => "four_pane".to_string(),
+            };
+
+            Effect::SaveConfig
+        }
+
+        AppMessage::PaneWidthsUpdated(widths) => {
+            state.layout_config.pane_widths = widths;
+            state.config.pane_widths = widths;
+            Effect::SaveConfig
         }
     }
 }

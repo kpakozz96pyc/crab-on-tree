@@ -14,6 +14,12 @@ pub struct AppConfig {
 
     #[serde(default = "default_max_recent")]
     pub max_recent: usize,
+
+    #[serde(default = "default_layout_mode")]
+    pub layout_mode: String,
+
+    #[serde(default = "default_pane_widths")]
+    pub pane_widths: [f32; 4],
 }
 
 fn default_theme() -> String {
@@ -24,12 +30,22 @@ fn default_max_recent() -> usize {
     10
 }
 
+fn default_layout_mode() -> String {
+    "four_pane".to_string()
+}
+
+fn default_pane_widths() -> [f32; 4] {
+    [0.15, 0.25, 0.20, 0.40]
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
             theme: default_theme(),
             recent_repos: Vec::new(),
             max_recent: default_max_recent(),
+            layout_mode: default_layout_mode(),
+            pane_widths: default_pane_widths(),
         }
     }
 }

@@ -2,7 +2,7 @@
 
 A fast, modern Git GUI built with Rust, powered by [gitoxide](https://github.com/Byron/gitoxide) and [egui](https://github.com/emilk/egui).
 
-**Status**: Phase 2a Complete - Production Ready ✅
+**Status**: Phase 2a Complete + 4-Pane Layout - Production Ready ✅
 
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org)
@@ -11,12 +11,15 @@ A fast, modern Git GUI built with Rust, powered by [gitoxide](https://github.com
 
 ### Core Functionality
 - 📁 **Repository Management** - Open and browse Git repositories
+- 🖼️ **4-Pane Layout** - Modern horizontal layout with branches, file tree, changed files, and file viewer
+- 🌿 **Branch Navigation** - Visual branch/tag navigation with checkout support
+- 📂 **Full File Tree** - Browse entire repository, not just changed files
 - 📝 **Smart Staging** - Stage/unstage files individually or in bulk with optimized batch operations
 - 💬 **Rich Commits** - Create commits with multi-line messages and author identity
 - 📜 **Commit History** - Browse commit history with detailed diffs
 - 🔍 **Powerful Search** - Search files and commits instantly
 - ⌨️ **Keyboard First** - Complete keyboard navigation with vim-style shortcuts
-- 🎨 **Modern UI** - Clean, responsive interface with dark/light themes
+- 🎨 **Modern UI** - Clean, responsive interface with dark/light themes and layout toggle
 
 ### Performance
 - 🚀 **Blazing Fast** - Handles 1,000+ files and 500+ commits smoothly
@@ -81,13 +84,23 @@ cargo build --release
 | `Ctrl+F` | Focus commit search |
 | `Esc` | Clear/blur |
 
-### Panels
+### Panels (Classic Mode)
 | Key | Action |
 |-----|--------|
 | `1` | Working directory |
 | `2` | Commit message |
 | `3` | Commit history |
 | `Tab` | Cycle panels |
+
+### Panels (4-Pane Mode)
+| Key | Action |
+|-----|--------|
+| `1` | Branch tree |
+| `2` | File tree |
+| `3` | Changed files |
+| `4` | File viewer |
+| `Tab` / `Shift+Tab` | Cycle panes |
+| `Shift+L` | Toggle layout mode |
 
 ### Actions
 | Key | Action |
@@ -206,9 +219,9 @@ crabontree/
 
 ## 🎯 Project Status
 
-**Current Phase**: Phase 2a - Core Features ✅ COMPLETE
+**Current Phase**: Phase 2a + 4-Pane Layout ✅ COMPLETE
 
-### Completed (60-65 hours)
+### Completed (65-70 hours)
 
 **Sprint 1**: Foundation
 - ✅ Working directory status
@@ -226,12 +239,22 @@ crabontree/
 - ✅ Enhanced keyboard shortcuts (vim-style navigation)
 - ✅ Performance testing and validation
 
+**4-Pane Layout Implementation**: Professional GUI Experience
+- ✅ 4-pane horizontal layout (branches, file tree, changed files, file viewer)
+- ✅ Branch and tag navigation with checkout support
+- ✅ Full repository file tree browser
+- ✅ Grouped changed files (staged/unstaged/untracked/conflicted)
+- ✅ File content and diff viewer with syntax highlighting
+- ✅ Resizable panes with drag separators
+- ✅ Layout toggle (Classic ↔ 4-Pane)
+- ✅ Configuration persistence
+
 ### Future Phases
 
 **Phase 2b**: Advanced Features
-- Branch visualization
-- Branch creation/deletion/switching
+- Branch creation/deletion
 - Stash management
+- Enhanced conflict resolution
 
 **Phase 2c**: Remote Operations
 - Fetch/pull/push

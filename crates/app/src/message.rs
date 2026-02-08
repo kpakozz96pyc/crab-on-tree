@@ -1,7 +1,8 @@
 //! Application messages for state updates.
 
 use std::path::PathBuf;
-use crabontree_git::{Commit, FileDiff, StatusSummary, WorkingDirFile};
+use crabontree_git::{Commit, DiffHunk, FileDiff, StatusSummary, WorkingDirFile};
+use crate::state::{BranchTreeState, ChangedFilesState, DiffViewMode, FileTreeState};
 
 /// Messages that drive application state changes.
 #[derive(Debug, Clone)]
@@ -99,4 +100,76 @@ pub enum AppMessage {
         name: String,
         email: String,
     },
+
+    // ===== 4-Pane Layout Messages =====
+
+    /// User requested to load branch tree.
+    LoadBranchTreeRequested,
+
+    /// Branch tree was loaded.
+    BranchTreeLoaded(BranchTreeState),
+
+    /// User toggled a branch tree section (expand/collapse).
+    BranchSectionToggled(String),
+
+    /// User requested to checkout a branch.
+    BranchCheckoutRequested(String),
+
+    /// Branch was checked out successfully.
+    BranchCheckedOut(String),
+
+    /// User requested to load file tree.
+    LoadFileTreeRequested,
+
+    /// File tree was loaded.
+    FileTreeLoaded(FileTreeState),
+
+    /// User toggled a file tree node (expand/collapse).
+    FileTreeNodeToggled(PathBuf),
+
+    /// User selected a file tree node.
+    FileTreeNodeSelected(PathBuf),
+
+    /// User requested to load changed files.
+    LoadChangedFilesRequested,
+
+    /// Changed files were loaded.
+    ChangedFilesLoaded(ChangedFilesState),
+
+    /// User selected a changed file.
+    ChangedFileSelected(PathBuf),
+
+    /// User requested to view file content.
+    FileContentRequested(PathBuf),
+
+    /// File content was loaded.
+    FileContentLoaded {
+        path: PathBuf,
+        content: String,
+        language: Option<String>,
+    },
+
+    /// User requested to view file diff.
+    FileDiffRequested(PathBuf),
+
+    /// File diff was loaded.
+    FileDiffLoaded {
+        path: PathBuf,
+        hunks: Vec<DiffHunk>,
+    },
+
+    /// Binary file was detected.
+    BinaryFileDetected {
+        path: PathBuf,
+        size: u64,
+    },
+
+    /// User changed diff view mode.
+    DiffViewModeChanged(DiffViewMode),
+
+    /// User toggled layout mode.
+    LayoutModeToggled,
+
+    /// Pane widths were updated.
+    PaneWidthsUpdated([f32; 4]),
 }

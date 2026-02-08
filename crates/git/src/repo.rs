@@ -713,6 +713,256 @@ impl GitRepository {
         Ok(commit_hash)
     }
 
+    /// List all local branches with metadata.
+    #[instrument(skip(self))]
+    pub fn list_local_branches(&self) -> Result<Vec<(String, String, bool, Option<String>)>, GitError> {
+        let mut branches = Vec::new();
+
+        let head = self.gix_repo.head()
+            .map_err(|e| GitError::RefNotFound(format!("Failed to get HEAD: {}", e)))?;
+
+        let current_branch = if !head.is_detached() {
+            head.referent_name()
+                .and_then(|name| name.shorten().to_string().into())
+        } else {
+            None
+        };
+
+        let references = self.gix_repo.references()
+            .map_err(|e| GitError::OperationFailed(format!("Failed to get references: {}", e)))?;
+
+        for r in (references.local_branches()
+            .map_err(|e| GitError::OperationFailed(format!("Failed to iterate branches: {}", e)))?).flatten()
+        {
+            if let Some(name) = r.name().shorten().to_string().into() {
+                let commit_hash = r.id().to_string();
+                let is_current = current_branch.as_deref() == Some(&name);
+
+                // Try to get upstream (tracking branch)
+                let upstream = None; // TODO: Implement upstream tracking if needed
+
+                branches.push((name, commit_hash, is_current, upstream));
+            }
+        }
+
+        tracing::debug!("Found {} local branches", branches.len());
+        Ok(branches)
+    }
+
+    /// List all remote branches grouped by remote name.
+    #[instrument(skip(self))]
+    pub fn list_remote_branches(&self) -> Result<std::collections::HashMap<String, Vec<(String, String)>>, GitError> {
+        use std::collections::HashMap;
+
+        let mut remotes: HashMap<String, Vec<(String, String)>> = HashMap::new();
+
+        let references = self.gix_repo.references()
+            .map_err(|e| GitError::OperationFailed(format!("Failed to get references: {}", e)))?;
+
+        for r in (references.remote_branches()
+            .map_err(|e| GitError::OperationFailed(format!("Failed to iterate remote branches: {}", e)))?).flatten()
+        {
+            if let Some(full_name) = r.name().shorten().to_string().into() {
+                // full_name is like "origin/main"
+                let parts: Vec<&str> = full_name.splitn(2, '/').collect();
+                if parts.len() == 2 {
+                    let remote = parts[0].to_string();
+                    let branch = parts[1].to_string();
+                    let commit_hash = r.id().to_string();
+
+                    remotes.entry(remote)
+                        .or_insert_with(Vec::new)
+                        .push((branch, commit_hash));
+                }
+            }
+        }
+
+        tracing::debug!("Found {} remotes with branches", remotes.len());
+        Ok(remotes)
+    }
+
+    /// List all tags (annotated and lightweight).
+    #[instrument(skip(self))]
+    pub fn list_tags(&self) -> Result<Vec<(String, String, Option<String>)>, GitError> {
+        let mut tags = Vec::new();
+
+        let references = self.gix_repo.references()
+            .map_err(|e| GitError::OperationFailed(format!("Failed to get references: {}", e)))?;
+
+        for r in (references.tags()
+            .map_err(|e| GitError::OperationFailed(format!("Failed to iterate tags: {}", e)))?).flatten()
+        {
+            if let Some(name) = r.name().shorten().to_string().into() {
+                let commit_hash = r.id().to_string();
+
+                // Try to get tag message (for annotated tags)
+                let message = None; // TODO: Parse tag object for message if needed
+
+                tags.push((name, commit_hash, message));
+            }
+        }
+
+        tracing::debug!("Found {} tags", tags.len());
+        Ok(tags)
+    }
+
+    /// Checkout a branch.
+    #[instrument(skip(self))]
+    pub fn checkout_branch(&self, branch_name: &str) -> Result<(), GitError> {
+        // Use git2 for checkout (write operation)
+        let obj = self.git2_repo.revparse_single(&format!("refs/heads/{}", branch_name))?;
+
+        self.git2_repo.checkout_tree(&obj, None)?;
+        self.git2_repo.set_head(&format!("refs/heads/{}", branch_name))?;
+
+        tracing::info!("Checked out branch: {}", branch_name);
+        Ok(())
+    }
+
+    /// Build repository tree from working directory.
+    #[instrument(skip(self))]
+    pub fn get_repository_tree(&self) -> Result<Vec<(PathBuf, bool, u64)>, GitError> {
+        use std::fs;
+
+        let mut entries = Vec::new();
+        let repo_path = self.path();
+
+        fn walk_dir(
+            path: &Path,
+            repo_root: &Path,
+            entries: &mut Vec<(PathBuf, bool, u64)>,
+        ) -> Result<(), GitError> {
+            let read_dir = fs::read_dir(path)
+                .map_err(|e| GitError::OperationFailed(format!("Failed to read directory: {}", e)))?;
+
+            for entry in read_dir {
+                let entry = entry
+                    .map_err(|e| GitError::OperationFailed(format!("Failed to read entry: {}", e)))?;
+                let path = entry.path();
+
+                // Skip .git directory
+                if path.file_name().and_then(|n| n.to_str()) == Some(".git") {
+                    continue;
+                }
+
+                let metadata = entry.metadata()
+                    .map_err(|e| GitError::OperationFailed(format!("Failed to get metadata: {}", e)))?;
+
+                let relative = path.strip_prefix(repo_root)
+                    .map_err(|e| GitError::OperationFailed(format!("Path error: {}", e)))?
+                    .to_path_buf();
+
+                let is_dir = metadata.is_dir();
+                let size = if is_dir { 0 } else { metadata.len() };
+
+                entries.push((relative, is_dir, size));
+
+                if is_dir {
+                    walk_dir(&path, repo_root, entries)?;
+                }
+            }
+
+            Ok(())
+        }
+
+        walk_dir(repo_path, repo_path, &mut entries)?;
+
+        tracing::debug!("Built repository tree with {} entries", entries.len());
+        Ok(entries)
+    }
+
+    /// Get file content from filesystem.
+    #[instrument(skip(self))]
+    pub fn get_file_content(&self, file_path: &Path) -> Result<String, GitError> {
+        let full_path = self.path().join(file_path);
+
+        let content = std::fs::read_to_string(&full_path)
+            .map_err(|e| GitError::OperationFailed(format!("Failed to read file: {}", e)))?;
+
+        tracing::debug!("Read file content: {} bytes", content.len());
+        Ok(content)
+    }
+
+    /// Get diff hunks for a changed file.
+    #[instrument(skip(self))]
+    pub fn get_file_diff(&self, file_path: &Path) -> Result<Vec<DiffHunk>, GitError> {
+        // Get HEAD tree
+        let head = self.git2_repo.head()?;
+        let head_tree = head.peel_to_tree()?;
+
+        // Create diff options
+        let mut diff_opts = git2::DiffOptions::new();
+        diff_opts.pathspec(file_path);
+
+        // Create diff between HEAD and working directory
+        let diff = self.git2_repo.diff_tree_to_workdir_with_index(
+            Some(&head_tree),
+            Some(&mut diff_opts),
+        )?;
+
+        let mut hunks = Vec::new();
+
+        // Process each delta
+        for (delta_idx, _delta) in diff.deltas().enumerate() {
+            let patch = git2::Patch::from_diff(&diff, delta_idx)?;
+
+            if let Some(patch) = patch {
+                for hunk_idx in 0..patch.num_hunks() {
+                    let (hunk, hunk_lines_count) = patch.hunk(hunk_idx)?;
+                    let mut hunk_lines = Vec::new();
+
+                    for line_idx in 0..hunk_lines_count {
+                        let line = patch.line_in_hunk(hunk_idx, line_idx)?;
+
+                        let (line_type, old_line_num, new_line_num) = match line.origin() {
+                            '+' => (DiffLineType::Addition, None, line.new_lineno()),
+                            '-' => (DiffLineType::Deletion, line.old_lineno(), None),
+                            ' ' => (DiffLineType::Context, line.old_lineno(), line.new_lineno()),
+                            _ => continue,
+                        };
+
+                        let content = String::from_utf8_lossy(line.content()).to_string();
+
+                        hunk_lines.push(DiffLine {
+                            line_type,
+                            content,
+                            old_line_number: old_line_num.map(|n| n as usize),
+                            new_line_number: new_line_num.map(|n| n as usize),
+                        });
+                    }
+
+                    hunks.push(DiffHunk {
+                        old_start: hunk.old_start() as usize,
+                        old_lines: hunk.old_lines() as usize,
+                        new_start: hunk.new_start() as usize,
+                        new_lines: hunk.new_lines() as usize,
+                        lines: hunk_lines,
+                    });
+                }
+            }
+        }
+
+        tracing::debug!("Generated {} diff hunks for file", hunks.len());
+        Ok(hunks)
+    }
+
+    /// Check if a file is binary (contains null bytes).
+    #[instrument(skip(self))]
+    pub fn is_binary_file(&self, file_path: &Path) -> Result<bool, GitError> {
+        let full_path = self.path().join(file_path);
+
+        // Read first 8KB to check for null bytes
+        let mut buffer = vec![0u8; 8192];
+        let bytes_read = std::fs::File::open(&full_path)
+            .and_then(|mut f| std::io::Read::read(&mut f, &mut buffer))
+            .map_err(|e| GitError::OperationFailed(format!("Failed to read file: {}", e)))?;
+
+        let is_binary = buffer[..bytes_read].contains(&0);
+
+        tracing::debug!("File is binary: {}", is_binary);
+        Ok(is_binary)
+    }
+
     /// Parse a gix commit object into our Commit struct.
     fn parse_commit(&self, commit: &gix::Commit) -> Result<Commit, GitError> {
         let hash = commit.id.to_string();
