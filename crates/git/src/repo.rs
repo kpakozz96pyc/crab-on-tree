@@ -735,7 +735,20 @@ impl GitRepository {
             .map_err(|e| GitError::OperationFailed(format!("Failed to iterate branches: {}", e)))?).flatten()
         {
             if let Some(name) = r.name().shorten().to_string().into() {
-                let commit_hash = r.id().to_string();
+                // Use try_id() to handle symbolic references safely
+                let commit_hash = match r.try_id() {
+                    Some(id) => id.to_string(),
+                    None => {
+                        // If it's a symbolic ref, try to peel it
+                        match r.clone().into_fully_peeled_id() {
+                            Ok(id) => id.to_string(),
+                            Err(_) => {
+                                tracing::warn!("Could not resolve branch {}", name);
+                                continue;
+                            }
+                        }
+                    }
+                };
                 let is_current = current_branch.as_deref() == Some(&name);
 
                 // Try to get upstream (tracking branch)
@@ -768,7 +781,21 @@ impl GitRepository {
                 if parts.len() == 2 {
                     let remote = parts[0].to_string();
                     let branch = parts[1].to_string();
-                    let commit_hash = r.id().to_string();
+
+                    // Use try_id() to handle symbolic references safely
+                    let commit_hash = match r.try_id() {
+                        Some(id) => id.to_string(),
+                        None => {
+                            // If it's a symbolic ref, try to peel it
+                            match r.clone().into_fully_peeled_id() {
+                                Ok(id) => id.to_string(),
+                                Err(_) => {
+                                    tracing::warn!("Could not resolve remote branch {}/{}", remote, branch);
+                                    continue;
+                                }
+                            }
+                        }
+                    };
 
                     remotes.entry(remote)
                         .or_insert_with(Vec::new)
@@ -793,7 +820,20 @@ impl GitRepository {
             .map_err(|e| GitError::OperationFailed(format!("Failed to iterate tags: {}", e)))?).flatten()
         {
             if let Some(name) = r.name().shorten().to_string().into() {
-                let commit_hash = r.id().to_string();
+                // Use try_id() to handle symbolic references safely
+                let commit_hash = match r.try_id() {
+                    Some(id) => id.to_string(),
+                    None => {
+                        // If it's a symbolic ref, try to peel it
+                        match r.clone().into_fully_peeled_id() {
+                            Ok(id) => id.to_string(),
+                            Err(_) => {
+                                tracing::warn!("Could not resolve tag {}", name);
+                                continue;
+                            }
+                        }
+                    }
+                };
 
                 // Try to get tag message (for annotated tags)
                 let message = None; // TODO: Parse tag object for message if needed
