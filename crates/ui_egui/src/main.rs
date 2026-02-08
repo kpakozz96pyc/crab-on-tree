@@ -435,13 +435,16 @@ impl CrabOnTreeApp {
             return;
         };
 
-        // Horizontal 4-pane layout
+        // Horizontal 4-pane layout - capture full height first
+        let full_height = ui.available_height();
         ui.horizontal(|ui| {
             let available_width = ui.available_width();
 
             // Pane 1: Branch Tree
             let pane1_width = available_width * self.pane_widths[0];
-            ui.allocate_ui(egui::vec2(pane1_width, ui.available_height()), |ui| {
+            ui.allocate_ui(egui::vec2(pane1_width, full_height), |ui| {
+                ui.set_min_height(full_height);
+                ui.set_max_height(full_height);
                 egui::Frame::none()
                     .fill(egui::Color32::from_rgb(30, 30, 35))
                     .show(ui, |ui| {
@@ -458,11 +461,13 @@ impl CrabOnTreeApp {
             });
 
             // Separator 1
-            self.render_vertical_separator(ui, 0, available_width);
+            self.render_vertical_separator(ui, 0, available_width, full_height);
 
             // Pane 2: File Tree
             let pane2_width = available_width * self.pane_widths[1];
-            ui.allocate_ui(egui::vec2(pane2_width, ui.available_height()), |ui| {
+            ui.allocate_ui(egui::vec2(pane2_width, full_height), |ui| {
+                ui.set_min_height(full_height);
+                ui.set_max_height(full_height);
                 egui::Frame::none()
                     .fill(egui::Color32::from_rgb(30, 30, 35))
                     .show(ui, |ui| {
@@ -479,11 +484,13 @@ impl CrabOnTreeApp {
             });
 
             // Separator 2
-            self.render_vertical_separator(ui, 1, available_width);
+            self.render_vertical_separator(ui, 1, available_width, full_height);
 
             // Pane 3: Changed Files
             let pane3_width = available_width * self.pane_widths[2];
-            ui.allocate_ui(egui::vec2(pane3_width, ui.available_height()), |ui| {
+            ui.allocate_ui(egui::vec2(pane3_width, full_height), |ui| {
+                ui.set_min_height(full_height);
+                ui.set_max_height(full_height);
                 egui::Frame::none()
                     .fill(egui::Color32::from_rgb(30, 30, 35))
                     .show(ui, |ui| {
@@ -500,13 +507,15 @@ impl CrabOnTreeApp {
             });
 
             // Separator 3
-            self.render_vertical_separator(ui, 2, available_width);
+            self.render_vertical_separator(ui, 2, available_width, full_height);
 
             // Pane 4: File Viewer
             ui.allocate_ui_with_layout(
-                egui::vec2(ui.available_width(), ui.available_height()),
+                egui::vec2(ui.available_width(), full_height),
                 egui::Layout::top_down(egui::Align::LEFT),
                 |ui| {
+                    ui.set_min_height(full_height);
+                    ui.set_max_height(full_height);
                     egui::Frame::none()
                         .fill(egui::Color32::from_rgb(25, 25, 30))
                         .show(ui, |ui| {
@@ -519,11 +528,11 @@ impl CrabOnTreeApp {
         });
     }
 
-    fn render_vertical_separator(&mut self, ui: &mut egui::Ui, sep_idx: usize, total_width: f32) {
+    fn render_vertical_separator(&mut self, ui: &mut egui::Ui, sep_idx: usize, total_width: f32, height: f32) {
         let sep_width = 4.0;
         let sep_rect = egui::Rect::from_min_size(
             ui.cursor().min,
-            egui::vec2(sep_width, ui.available_height()),
+            egui::vec2(sep_width, height),
         );
 
         let sep_id = egui::Id::new(format!("pane_separator_{}", sep_idx));
