@@ -1,9 +1,8 @@
 //! CrabOnTree - A Rust Git GUI using gitoxide and egui.
 
 use crabontree_app::{
-    load_config, reduce, save_config, AppState, BranchTreeState, ChangedFilesState, Commit,
-    DiffLineType, Effect, FileDiff, FileStatus, FileTreeState, FileViewState, JobExecutor,
-    WorkingDirFile, WorkingDirStatus,
+    load_config, reduce, save_config, AppState, ChangedFilesState, Effect,
+    FileTreeState, FileViewState, JobExecutor,
 };
 use crabontree_ui_core::{Color, Theme};
 use eframe::egui;
@@ -56,14 +55,9 @@ struct CrabOnTreeApp {
     theme: Theme,
     active_panel: ActivePanel,
     show_shortcuts_help: bool,
-    vim_g_pressed: bool,  // For 'gg' vim-style navigation
     // 4-pane layout state
     pane_widths: [f32; 4],
     active_pane: usize,
-    branch_tree_search: String,
-    file_tree_search: String,
-    focused_branch_index: Option<usize>,
-    focused_tree_node_index: Option<usize>,
 }
 
 impl CrabOnTreeApp {
@@ -93,13 +87,8 @@ impl CrabOnTreeApp {
             theme,
             active_panel: ActivePanel::BranchTree,
             show_shortcuts_help: false,
-            vim_g_pressed: false,
             pane_widths,
             active_pane: 0,
-            branch_tree_search: String::new(),
-            file_tree_search: String::new(),
-            focused_branch_index: None,
-            focused_tree_node_index: None,
         }
     }
 
@@ -287,13 +276,6 @@ impl CrabOnTreeApp {
         });
     }
 
-    fn format_timestamp(timestamp: i64) -> String {
-        use chrono::{DateTime, Utc};
-        DateTime::from_timestamp(timestamp, 0)
-            .map(|d| d.with_timezone(&Utc).format("%Y-%m-%d %H:%M:%S").to_string())
-            .unwrap_or_else(|| "Invalid date".to_string())
-    }
-
     fn render_shortcuts_help(&mut self, ctx: &egui::Context) {
         egui::Window::new("⌨️ Keyboard Shortcuts")
             .open(&mut self.show_shortcuts_help)
@@ -424,7 +406,7 @@ impl CrabOnTreeApp {
         }
 
         // Clone necessary data
-        let (branch_tree, file_tree, changed_files, file_view) = if let Some(repo) = &self.state.current_repo {
+        let (_branch_tree, file_tree, changed_files, file_view) = if let Some(repo) = &self.state.current_repo {
             (
                 repo.branch_tree.clone(),
                 repo.file_tree.clone(),
@@ -451,19 +433,15 @@ impl CrabOnTreeApp {
                         ui.vertical(|ui| {
                             // Fixed header at top
                             ui.add_space(5.0);
-                            ui.heading("Branches & Tags");
+                            ui.heading("Commit History");
                             ui.separator();
                             ui.add_space(5.0);
 
                             // Scrollable content below
                             egui::ScrollArea::vertical()
-                                .id_source("pane1_branch_tree_scroll")
+                                .id_source("pane1_commit_history_scroll")
                                 .show(ui, |ui| {
-                                    if let Some(tree) = &branch_tree {
-                                        self.render_branch_tree_pane(ui, tree);
-                                    } else {
-                                        ui.label("Loading branches...");
-                                    }
+                                    self.render_commit_history_pane(ui);
                                 });
                         });
                     });
@@ -483,18 +461,18 @@ impl CrabOnTreeApp {
                         ui.vertical(|ui| {
                             // Fixed header at top
                             ui.add_space(5.0);
-                            ui.heading("File Tree");
+                            ui.heading("Changed Files");
                             ui.separator();
                             ui.add_space(5.0);
 
                             // Scrollable content below
                             egui::ScrollArea::vertical()
-                                .id_source("pane2_file_tree_scroll")
+                                .id_source("pane2_changed_files_scroll")
                                 .show(ui, |ui| {
-                                    if let Some(tree) = &file_tree {
-                                        self.render_file_tree_pane(ui, tree);
+                                    if let Some(files) = &changed_files {
+                                        self.render_changed_files_pane(ui, files);
                                     } else {
-                                        ui.label("Loading file tree...");
+                                        ui.label("Loading changed files...");
                                     }
                                 });
                         });
@@ -515,18 +493,18 @@ impl CrabOnTreeApp {
                         ui.vertical(|ui| {
                             // Fixed header at top
                             ui.add_space(5.0);
-                            ui.heading("Changed Files");
+                            ui.heading("File Tree");
                             ui.separator();
                             ui.add_space(5.0);
 
                             // Scrollable content below
                             egui::ScrollArea::vertical()
-                                .id_source("pane3_changed_files_scroll")
+                                .id_source("pane3_file_tree_scroll")
                                 .show(ui, |ui| {
-                                    if let Some(files) = &changed_files {
-                                        self.render_changed_files_pane(ui, files);
+                                    if let Some(tree) = &file_tree {
+                                        self.render_file_tree_pane(ui, tree);
                                     } else {
-                                        ui.label("Loading changed files...");
+                                        ui.label("Loading file tree...");
                                     }
                                 });
                         });
@@ -549,13 +527,13 @@ impl CrabOnTreeApp {
                             ui.vertical(|ui| {
                                 // Fixed header at top
                                 ui.add_space(5.0);
-                                ui.heading("File Viewer");
+                                ui.heading("Diff Viewer");
                                 ui.separator();
                                 ui.add_space(5.0);
 
                                 // Scrollable content below
                                 egui::ScrollArea::vertical()
-                                    .id_source("pane4_file_viewer_scroll")
+                                    .id_source("pane4_diff_viewer_scroll")
                                     .show(ui, |ui| {
                                         self.render_file_viewer_pane(ui, &file_view);
                                     });
@@ -564,6 +542,50 @@ impl CrabOnTreeApp {
                 },
             );
         });
+    }
+
+    fn render_commit_history_pane(&mut self, ui: &mut egui::Ui) {
+        let commits = if let Some(repo) = &self.state.current_repo {
+            repo.commits.clone()
+        } else {
+            Vec::new()
+        };
+
+        let selected_commit = if let Some(repo) = &self.state.current_repo {
+            repo.selected_commit.clone()
+        } else {
+            None
+        };
+
+        if commits.is_empty() {
+            ui.vertical_centered(|ui| {
+                ui.add_space(20.0);
+                if ui.button("Load Commit History").clicked() {
+                    self.handle_message(crabontree_app::AppMessage::LoadCommitHistoryRequested);
+                }
+            });
+        } else {
+            for (idx, commit) in commits.iter().enumerate() {
+                ui.push_id(format!("commit_{}", idx), |ui| {
+                    let is_selected = selected_commit.as_ref() == Some(&commit.hash);
+                    let label = format!("{} - {}",
+                        &commit.hash[..7],
+                        commit.message_summary
+                    );
+
+                    if ui.selectable_label(is_selected, label)
+                        .on_hover_text(&commit.hash)
+                        .clicked()
+                    {
+                        if is_selected {
+                            self.handle_message(crabontree_app::AppMessage::CommitDeselected);
+                        } else {
+                            self.handle_message(crabontree_app::AppMessage::CommitSelected(commit.hash.clone()));
+                        }
+                    }
+                });
+            }
+        }
     }
 
     fn render_vertical_separator(&mut self, ui: &mut egui::Ui, sep_idx: usize, total_width: f32, height: f32) {
@@ -612,122 +634,6 @@ impl CrabOnTreeApp {
 
         ui.painter().rect_filled(visual_rect, 1.0, color);
         ui.allocate_space(egui::vec2(sep_width, 0.0));
-    }
-
-    fn render_branch_tree_pane(&mut self, ui: &mut egui::Ui, tree: &BranchTreeState) {
-        // Commit History section
-        let commits = if let Some(repo) = &self.state.current_repo {
-            repo.commits.clone()
-        } else {
-            Vec::new()
-        };
-
-        let selected_commit = if let Some(repo) = &self.state.current_repo {
-            repo.selected_commit.clone()
-        } else {
-            None
-        };
-
-        egui::CollapsingHeader::new(format!("📜 Commit History ({})", commits.len()))
-            .id_source("commit_history_section")
-            .default_open(true)
-            .show(ui, |ui| {
-                if commits.is_empty() {
-                    if ui.button("Load Commit History").clicked() {
-                        self.handle_message(crabontree_app::AppMessage::LoadCommitHistoryRequested);
-                    }
-                } else {
-                    egui::ScrollArea::vertical()
-                        .id_source("commit_history_list")
-                        .max_height(300.0)
-                        .show(ui, |ui| {
-                            for (idx, commit) in commits.iter().enumerate() {
-                                ui.push_id(format!("commit_{}", idx), |ui| {
-                                    let is_selected = selected_commit.as_ref() == Some(&commit.hash);
-                                    let label = format!("{} - {}",
-                                        &commit.hash[..7],
-                                        commit.message_summary
-                                    );
-
-                                    if ui.selectable_label(is_selected, label)
-                                        .on_hover_text(&commit.hash)
-                                        .clicked()
-                                    {
-                                        if is_selected {
-                                            self.handle_message(crabontree_app::AppMessage::CommitDeselected);
-                                        } else {
-                                            self.handle_message(crabontree_app::AppMessage::CommitSelected(commit.hash.clone()));
-                                        }
-                                    }
-                                });
-                            }
-                        });
-                }
-            });
-
-        ui.add_space(10.0);
-
-        // Local branches section
-        let local_header = egui::CollapsingHeader::new("📂 Local Branches")
-            .id_source("branch_tree_local")
-            .show(ui, |ui| {
-                for (idx, branch) in tree.local_branches.iter().enumerate() {
-                    ui.push_id(format!("local_branch_{}", idx), |ui| {
-                        ui.horizontal(|ui| {
-                            let label = if branch.is_current {
-                                format!("➤ {}", branch.name)
-                            } else {
-                                format!("  {}", branch.name)
-                            };
-
-                            if ui.selectable_label(branch.is_current, label).clicked() && !branch.is_current {
-                                self.handle_message(crabontree_app::AppMessage::BranchCheckoutRequested(branch.name.clone()));
-                            }
-                        });
-                    });
-                }
-            });
-        if local_header.header_response.clicked() {
-            self.handle_message(crabontree_app::AppMessage::BranchSectionToggled("local".to_string()));
-        }
-
-        ui.add_space(10.0);
-
-        // Remote branches section
-        for (remote_idx, (remote, branches)) in tree.remote_branches.iter().enumerate() {
-            let remote_header = egui::CollapsingHeader::new(format!("📡 {}", remote))
-                .id_source(format!("branch_tree_remote_{}", remote_idx))
-                .show(ui, |ui| {
-                    for (branch_idx, branch) in branches.iter().enumerate() {
-                        ui.push_id(format!("remote_{}_{}", remote_idx, branch_idx), |ui| {
-                            ui.horizontal(|ui| {
-                                ui.label(format!("  {}", branch.name));
-                            });
-                        });
-                    }
-                });
-            if remote_header.header_response.clicked() {
-                self.handle_message(crabontree_app::AppMessage::BranchSectionToggled(remote.clone()));
-            }
-        }
-
-        ui.add_space(10.0);
-
-        // Tags section
-        let tags_header = egui::CollapsingHeader::new(format!("🏷  Tags ({})", tree.tags.len()))
-            .id_source("branch_tree_tags")
-            .show(ui, |ui| {
-                for (idx, tag) in tree.tags.iter().enumerate() {
-                    ui.push_id(format!("tag_{}", idx), |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label(format!("  {}", tag.name));
-                        });
-                    });
-                }
-            });
-        if tags_header.header_response.clicked() {
-            self.handle_message(crabontree_app::AppMessage::BranchSectionToggled("tags".to_string()));
-        }
     }
 
     fn render_file_tree_pane(&mut self, ui: &mut egui::Ui, tree: &FileTreeState) {
