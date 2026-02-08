@@ -39,4 +39,34 @@ pub enum Job {
         repo_path: PathBuf,
         commit_hash: String,
     },
+
+    /// Load working directory status.
+    LoadWorkingDirStatus(PathBuf),
+
+    /// Stage a file.
+    StageFile {
+        repo_path: PathBuf,
+        file_path: PathBuf,
+    },
+
+    /// Unstage a file.
+    UnstageFile {
+        repo_path: PathBuf,
+        file_path: PathBuf,
+    },
+
+    /// Stage all changes.
+    StageAll(PathBuf),
+
+    /// Unstage all changes.
+    UnstageAll(PathBuf),
+
+    /// Create a commit with the given message.
+    CreateCommit {
+        repo_path: PathBuf,
+        message: String,
+    },
+
+    /// Load author identity from git config.
+    LoadAuthorIdentity(PathBuf),
 }

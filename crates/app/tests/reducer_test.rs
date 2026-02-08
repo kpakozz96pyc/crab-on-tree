@@ -10,6 +10,7 @@ fn default_state() -> AppState {
         loading: false,
         error: None,
         config: AppConfig::default(),
+        staging_progress: None,
     }
 }
 
@@ -90,6 +91,11 @@ fn test_close_repo() {
         status_summary: StatusSummary::default(),
         commits: Vec::new(),
         selected_commit: None,
+        commit_diff: None,
+        working_dir_files: Vec::new(),
+        commit_message: String::new(),
+        author_name: String::new(),
+        author_email: String::new(),
     });
 
     let effect = reduce(&mut state, AppMessage::CloseRepo);
@@ -110,6 +116,11 @@ fn test_refresh_repo() {
         status_summary: StatusSummary::default(),
         commits: Vec::new(),
         selected_commit: None,
+        commit_diff: None,
+        working_dir_files: Vec::new(),
+        commit_message: String::new(),
+        author_name: String::new(),
+        author_email: String::new(),
     });
 
     let effect = reduce(&mut state, AppMessage::RefreshRepo);
@@ -139,6 +150,11 @@ fn test_repo_refreshed() {
         status_summary: StatusSummary::default(),
         commits: Vec::new(),
         selected_commit: None,
+        commit_diff: None,
+        working_dir_files: Vec::new(),
+        commit_message: String::new(),
+        author_name: String::new(),
+        author_email: String::new(),
     });
 
     state.loading = true;

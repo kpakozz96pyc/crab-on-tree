@@ -13,6 +13,7 @@ fn test_full_open_repository_flow() {
         loading: false,
         error: None,
         config: AppConfig::default(),
+        staging_progress: None,
     };
 
     // Create job executor
@@ -69,13 +70,13 @@ fn test_full_open_repository_flow() {
     println!("  HEAD: {}", repo.head);
     println!("  Branches: {:?}", repo.branches);
 
-    // Verify the Batch effect (SaveConfig + LoadCommitHistory)
+    // Verify the Batch effect (SaveConfig + LoadCommitHistory + LoadWorkingDirStatus + LoadAuthorIdentity)
     match effect {
         Effect::Batch(effects) => {
-            assert_eq!(effects.len(), 2, "Expected 2 effects in batch");
+            assert_eq!(effects.len(), 4, "Expected 4 effects in batch");
             // We don't need to check the exact order, just that they're there
         }
-        _ => panic!("Expected Effect::Batch with SaveConfig and LoadCommitHistory"),
+        _ => panic!("Expected Effect::Batch with SaveConfig, LoadCommitHistory, LoadWorkingDirStatus, and LoadAuthorIdentity"),
     }
 
     // Verify recent repos was updated
@@ -101,6 +102,7 @@ fn test_refresh_repository_flow() {
         loading: false,
         error: None,
         config: AppConfig::default(),
+        staging_progress: None,
     };
 
     let effect = reduce(&mut state, AppMessage::OpenRepoRequested(repo_path.clone()));
@@ -148,6 +150,7 @@ fn test_open_invalid_repository() {
         loading: false,
         error: None,
         config: AppConfig::default(),
+        staging_progress: None,
     };
 
     let (executor, mut message_rx) = JobExecutor::new();

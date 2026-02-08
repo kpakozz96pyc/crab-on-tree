@@ -70,6 +70,16 @@ fn worker_thread(
                 Job::LoadCommitHistory(path) => execute_load_commit_history(path).await,
                 Job::LoadCommitDiff { repo_path, commit_hash } =>
                     execute_load_commit_diff(repo_path, commit_hash).await,
+                Job::LoadWorkingDirStatus(path) => execute_load_working_dir_status(path).await,
+                Job::StageFile { repo_path, file_path } =>
+                    execute_stage_file(repo_path, file_path).await,
+                Job::UnstageFile { repo_path, file_path } =>
+                    execute_unstage_file(repo_path, file_path).await,
+                Job::StageAll(path) => execute_stage_all(path).await,
+                Job::UnstageAll(path) => execute_unstage_all(path).await,
+                Job::CreateCommit { repo_path, message } =>
+                    execute_create_commit(repo_path, message).await,
+                Job::LoadAuthorIdentity(path) => execute_load_author_identity(path).await,
             };
 
             match result {
@@ -189,4 +199,128 @@ async fn execute_load_commit_diff(repo_path: PathBuf, commit_hash: String) -> an
     .context("Task panicked")??;
 
     Ok(AppMessage::CommitDiffLoaded { commit_hash, diff })
+}
+
+/// Execute the LoadWorkingDirStatus job.
+#[instrument(skip(path))]
+async fn execute_load_working_dir_status(path: PathBuf) -> anyhow::Result<AppMessage> {
+    let files = tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+        let repo = GitRepository::open(&path)
+            .with_context(|| format!("Failed to open repository at {}", path.display()))?;
+
+        repo.get_working_dir_status()
+            .context("Failed to get working directory status")
+    })
+    .await
+    .context("Task panicked")??;
+
+    Ok(AppMessage::WorkingDirStatusLoaded(files))
+}
+
+/// Execute the StageFile job.
+#[instrument(skip(repo_path, file_path))]
+async fn execute_stage_file(repo_path: PathBuf, file_path: PathBuf) -> anyhow::Result<AppMessage> {
+    tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+        let repo = GitRepository::open(&repo_path)
+            .with_context(|| format!("Failed to open repository at {}", repo_path.display()))?;
+
+        repo.stage_file(&file_path)
+            .with_context(|| format!("Failed to stage file {}", file_path.display()))?;
+
+        Ok(())
+    })
+    .await
+    .context("Task panicked")??;
+
+    Ok(AppMessage::StagingCompleted)
+}
+
+/// Execute the UnstageFile job.
+#[instrument(skip(repo_path, file_path))]
+async fn execute_unstage_file(repo_path: PathBuf, file_path: PathBuf) -> anyhow::Result<AppMessage> {
+    tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+        let repo = GitRepository::open(&repo_path)
+            .with_context(|| format!("Failed to open repository at {}", repo_path.display()))?;
+
+        repo.unstage_file(&file_path)
+            .with_context(|| format!("Failed to unstage file {}", file_path.display()))?;
+
+        Ok(())
+    })
+    .await
+    .context("Task panicked")??;
+
+    Ok(AppMessage::StagingCompleted)
+}
+
+/// Execute the StageAll job.
+#[instrument(skip(path))]
+async fn execute_stage_all(path: PathBuf) -> anyhow::Result<AppMessage> {
+    tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+        let repo = GitRepository::open(&path)
+            .with_context(|| format!("Failed to open repository at {}", path.display()))?;
+
+        repo.stage_all()
+            .context("Failed to stage all changes")?;
+
+        Ok(())
+    })
+    .await
+    .context("Task panicked")??;
+
+    Ok(AppMessage::StagingCompleted)
+}
+
+/// Execute the UnstageAll job.
+#[instrument(skip(path))]
+async fn execute_unstage_all(path: PathBuf) -> anyhow::Result<AppMessage> {
+    tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+        let repo = GitRepository::open(&path)
+            .with_context(|| format!("Failed to open repository at {}", path.display()))?;
+
+        repo.unstage_all()
+            .context("Failed to unstage all changes")?;
+
+        Ok(())
+    })
+    .await
+    .context("Task panicked")??;
+
+    Ok(AppMessage::StagingCompleted)
+}
+
+/// Execute the CreateCommit job.
+#[instrument(skip(repo_path, message))]
+async fn execute_create_commit(repo_path: PathBuf, message: String) -> anyhow::Result<AppMessage> {
+    let message_clone = message.clone();
+    let commit_hash = tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+        let repo = GitRepository::open(&repo_path)
+            .with_context(|| format!("Failed to open repository at {}", repo_path.display()))?;
+
+        repo.create_commit(&message_clone)
+            .context("Failed to create commit")
+    })
+    .await
+    .context("Task panicked")??;
+
+    Ok(AppMessage::CommitCreated {
+        hash: commit_hash,
+        message,
+    })
+}
+
+/// Execute the LoadAuthorIdentity job.
+#[instrument(skip(path))]
+async fn execute_load_author_identity(path: PathBuf) -> anyhow::Result<AppMessage> {
+    let (name, email) = tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+        let repo = GitRepository::open(&path)
+            .with_context(|| format!("Failed to open repository at {}", path.display()))?;
+
+        repo.get_author_identity()
+            .context("Failed to get author identity")
+    })
+    .await
+    .context("Task panicked")??;
+
+    Ok(AppMessage::AuthorIdentityLoaded { name, email })
 }

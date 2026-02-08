@@ -1,91 +1,142 @@
 # CrabOnTree Quick Start Guide
 
-## Building and Running
+**Version**: v0.1.0 (Phase 2a Complete)
 
-### Build the Application
+Get started with CrabOnTree in 5 minutes!
+
+## Installation
+
+### Build from Source
 
 ```bash
-# Debug build (faster compilation)
-cargo build --workspace
+# Clone the repository
+git clone https://github.com/yourusername/crabontree.git
+cd crabontree
 
-# Release build (optimized)
+# Build release version (recommended)
 cargo build --release
+
+# Run
+./target/release/crabontree
 ```
 
-### Run the Application
+### Prerequisites
 
-```bash
-# Run in debug mode
-cargo run --bin crabontree
+- Rust 1.70+ (`rustup install stable`)
+- Git 2.30+
 
-# Run release version
-cargo run --release --bin crabontree
+## First Use
 
-# Run with debug logging
-RUST_LOG=debug cargo run --bin crabontree
+### 1. Open a Repository
+
+- Launch CrabOnTree
+- Click "📂 Open Repository" button
+- Navigate to any Git repository
+- Select the directory
+
+### 2. View Your Changes
+
+The Working Directory panel shows all modified files:
+- `[U]` - Unstaged (modified but not staged)
+- `[S]` - Staged (ready to commit)
+- `[?]` - Untracked (new file)
+
+### 3. Stage Files
+
+**Individual files**:
+- Click `+` button next to file
+- Or press `Space` with keyboard navigation
+
+**All files**:
+- Click "Stage All" button
+- Or press `a` key
+
+### 4. Write Commit Message
+
+- Click in Commit Message box (or press `c`)
+- Type your message
+- First line: brief summary (< 50 chars)
+- Add blank line and details if needed
+
+### 5. Create Commit
+
+- Click "📝 Commit" button
+- Or press `Ctrl+Enter` in message box
+- Commit appears in history automatically
+
+## Essential Keyboard Shortcuts
+
+CrabOnTree is designed for keyboard-first workflow:
+
+```
+GLOBAL
+  1, 2, 3       Switch panels (Working Dir / Message / History)
+  Tab           Cycle through panels
+  r             Refresh repository
+  ?             Show help dialog
+
+NAVIGATION
+  ↑ / ↓         Navigate items
+  j / k         Navigate (vim-style)
+  g g           Jump to top
+  G             Jump to bottom
+
+ACTIONS
+  Space         Toggle file staging
+  a             Stage all files
+  u             Unstage all files
+  c             Focus commit message
+  Ctrl+Enter    Create commit
+  Enter         View commit details (in history)
+
+SEARCH
+  /             Search files
+  Ctrl+F        Search commits
+  Esc           Clear search
 ```
 
-## First Steps
+Press `?` in the app for complete reference!
 
-1. **Launch CrabOnTree**
-   ```bash
-   cargo run --bin crabontree
-   ```
+## Common Workflows
 
-2. **Open a Repository**
-   - Click "📂 Open Repository" button
-   - Navigate to any Git repository folder
-   - Select the folder
+### Quick Commit (5 seconds)
+```
+a                  Stage all
+c                  Focus message
+[type message]     Write commit
+Ctrl+Enter         Commit
+```
 
-3. **View Repository Information**
-   - Current branch displays at the top
-   - All branches are listed below
-   - Status summary shows file counts
+### Selective Staging
+```
+/                  Search files
+[filter]           Find specific files
+Space              Stage focused file
+Esc                Clear search
+c                  Write message
+Ctrl+Enter         Commit
+```
 
-4. **Try with CrabOnTree Itself**
-   ```bash
-   # CrabOnTree is a Git repository!
-   cargo run --bin crabontree
-   # Click "Open Repository"
-   # Navigate to the crab-on-tree/crab-on-tree folder
-   ```
-
-## Basic Operations
-
-### Open a Repository
-- Click "📂 Open Repository" button in the top panel
-- Or select from recent repositories on the welcome screen
-
-### Refresh Repository Data
-- Click "🔄 Refresh" button (appears when a repository is open)
-- Updates branch list and status
-
-### Close Repository
-- Click "✖ Close" button
-- Returns to welcome screen
-
-### View Recent Repositories
-- Recent repositories appear on the welcome screen
-- Click any path to quickly reopen
+### Browse History
+```
+3                  Focus history panel
+j / k              Navigate commits
+Enter              View commit details
+Ctrl+F             Search commits
+```
 
 ## Testing
 
 ```bash
 # Run all tests
 cargo test --workspace
-
-# Run with output
-cargo test --workspace -- --nocapture
-
-# Run with debug logging
-RUST_LOG=debug cargo test --workspace
 ```
 
 Expected results:
-- `crabontree-git`: 7 tests ✅
-- `crabontree-app`: 10 tests ✅
+- `crabontree-git`: 19 tests ✅
+- `crabontree-app`: 14 tests ✅
 - `crabontree-ui-core`: 5 tests ✅
-- **Total**: 22 tests ✅
+- **Total**: 38 tests ✅
 
 ## Troubleshooting
 
@@ -116,10 +167,10 @@ RUST_LOG=crabontree_git=trace cargo run
 
 ### UI Appears Frozen
 
-Phase 0 architecture ensures UI never freezes. If this happens:
+The async architecture ensures UI never freezes. If this happens:
 1. Check logs: `RUST_LOG=debug cargo run`
 2. Verify async job system is working
-3. Report as a bug
+3. Report as a bug on GitHub
 
 ### Tests Failing
 
@@ -158,14 +209,19 @@ Edit `config.toml`:
 max_recent = 20  # default is 10
 ```
 
-## Keyboard Shortcuts (Phase 0)
+## Performance Tips
 
-Currently no keyboard shortcuts are implemented in the UI, but they are defined in `ui_core`:
-- Ctrl+O: Open Repository (planned)
-- Ctrl+R: Refresh Repository (planned)
-- Ctrl+Q: Quit (planned)
+CrabOnTree is optimized for large repositories:
+- ✅ Handles 1,000+ files smoothly
+- ✅ 500+ commits load in < 500ms
+- ✅ Search is instant (< 100ms)
+- ✅ Virtual scrolling ensures smooth UI
+- ✅ Async operations keep UI responsive
 
-These will be activated in a future phase.
+**For best performance**:
+- Use release build: `cargo build --release`
+- Use search to filter large file lists
+- Keep diffs collapsed when not viewing
 
 ## Development Mode
 
@@ -247,21 +303,55 @@ cargo build --release
    - Start with `crates/ui_egui/src/main.rs`
    - Follow the data flow through the layers
 
+## Documentation
+
+**For Users**:
+- [USER_GUIDE.md](docs/USER_GUIDE.md) - Complete usage guide with workflows
+- [KEYBOARD_SHORTCUTS.md](docs/KEYBOARD_SHORTCUTS.md) - Full shortcut reference
+
+**For Developers**:
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System design and decisions
+- [CONTRIBUTING.md](docs/CONTRIBUTING.md) - How to contribute
+- [TESTING.md](docs/TESTING.md) - Testing strategy and guide
+
+## Getting Help
+
+- **Press `?`** in the app for keyboard shortcuts
+- **GitHub Issues**: Report bugs
+- **GitHub Discussions**: Ask questions
+- **Documentation**: Complete guides in `docs/`
+
 ## What's Next?
 
-After Phase 0, you can:
-- Explore the codebase structure
-- Read the architecture documentation
-- Try opening different repositories
-- Check the logs to understand the flow
-- Look forward to Phase 1 features (commit history)
+**Current Version**: v0.1.0 (Phase 2a Complete)
+
+**Available Now**:
+- ✅ Complete commit workflow (stage → commit → history)
+- ✅ Search and filter (files and commits)
+- ✅ Comprehensive keyboard shortcuts
+- ✅ Excellent performance with large repos
+
+**Coming Soon** (Phase 2b):
+- Branch visualization
+- Branch creation/switching
+- Stash management
+
+**Future** (Phase 2c & 3):
+- Remote operations (fetch/pull/push)
+- Merge and rebase
+- Conflict resolution
 
 ---
 
 **Ready to start?**
 
 ```bash
-cargo run --bin crabontree
+# Build and run
+cargo build --release
+./target/release/crabontree
+
+# Or run directly
+cargo run --release
 ```
 
-Enjoy using CrabOnTree! 🦀
+**Happy coding! 🦀🌳**

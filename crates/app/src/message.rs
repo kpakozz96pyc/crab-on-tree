@@ -1,7 +1,7 @@
 //! Application messages for state updates.
 
 use std::path::PathBuf;
-use crabontree_git::{Commit, FileDiff, StatusSummary};
+use crabontree_git::{Commit, FileDiff, StatusSummary, WorkingDirFile};
 
 /// Messages that drive application state changes.
 #[derive(Debug, Clone)]
@@ -52,5 +52,51 @@ pub enum AppMessage {
     CommitDiffLoaded {
         commit_hash: String,
         diff: Vec<FileDiff>,
+    },
+
+    /// User requested to load working directory status.
+    LoadWorkingDirStatusRequested,
+
+    /// Working directory status was loaded.
+    WorkingDirStatusLoaded(Vec<WorkingDirFile>),
+
+    /// User requested to stage a file.
+    StageFileRequested(PathBuf),
+
+    /// User requested to unstage a file.
+    UnstageFileRequested(PathBuf),
+
+    /// User requested to stage all changes.
+    StageAllRequested,
+
+    /// User requested to unstage all changes.
+    UnstageAllRequested,
+
+    /// Staging operation completed successfully.
+    StagingCompleted,
+
+    /// Staging progress update.
+    StagingProgress {
+        current: usize,
+        total: usize,
+        operation: String,
+    },
+
+    /// User updated the commit message.
+    CommitMessageUpdated(String),
+
+    /// User requested to create a commit.
+    CreateCommitRequested,
+
+    /// Commit was created successfully.
+    CommitCreated {
+        hash: String,
+        message: String,
+    },
+
+    /// Author identity was loaded.
+    AuthorIdentityLoaded {
+        name: String,
+        email: String,
     },
 }

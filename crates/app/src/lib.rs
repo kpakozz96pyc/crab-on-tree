@@ -12,10 +12,13 @@ pub mod reducer;
 pub mod state;
 
 pub use config::{load_config, save_config, AppConfig};
-pub use crabontree_git::{Commit, FileDiff, FileStatus};
+pub use crabontree_git::{
+    Commit, DiffHunk, DiffLine, DiffLineType, FileDiff, FileStatus, WorkingDirFile,
+    WorkingDirStatus,
+};
 pub use effect::Effect;
 pub use executor::JobExecutor;
 pub use job::{Job, JobId};
 pub use message::AppMessage;
 pub use reducer::reduce;
-pub use state::{AppState, RepoState};
+pub use state::{AppState, RepoState, StagingProgress};

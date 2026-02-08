@@ -8,4 +8,7 @@ pub mod error;
 pub mod repo;
 
 pub use error::GitError;
-pub use repo::{Commit, FileDiff, FileStatus, GitRepository, StatusSummary};
+pub use repo::{
+    Commit, DiffHunk, DiffLine, DiffLineType, FileDiff, FileStatus, GitRepository, StatusSummary,
+    WorkingDirFile, WorkingDirStatus,
+};

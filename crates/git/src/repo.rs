@@ -30,12 +30,44 @@ pub struct Commit {
 }
 
 /// Represents a file change in a commit.
-#[derive(Debug, Clone)]
+/// A line in a diff.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffLine {
+    pub line_type: DiffLineType,
+    pub content: String,
+    pub old_line_number: Option<usize>,
+    pub new_line_number: Option<usize>,
+}
+
+/// Type of a line in a diff.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiffLineType {
+    /// Context line (unchanged).
+    Context,
+    /// Line was added.
+    Addition,
+    /// Line was deleted.
+    Deletion,
+}
+
+/// A hunk in a diff (a section of changes).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffHunk {
+    pub old_start: usize,
+    pub old_lines: usize,
+    pub new_start: usize,
+    pub new_lines: usize,
+    pub lines: Vec<DiffLine>,
+}
+
+/// A file diff with hunks showing line-by-line changes.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileDiff {
     pub path: String,
     pub status: FileStatus,
     pub additions: usize,
     pub deletions: usize,
+    pub hunks: Vec<DiffHunk>,
 }
 
 /// Status of a file in a diff.
@@ -46,6 +78,34 @@ pub enum FileStatus {
     Deleted,
     Renamed,
     Copied,
+}
+
+/// Status of a file in the working directory.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WorkingDirStatus {
+    /// File is modified but not staged.
+    Modified,
+    /// File is new and not tracked.
+    Untracked,
+    /// File is deleted in working directory.
+    Deleted,
+    /// File is renamed.
+    Renamed,
+    /// File has merge conflicts.
+    Conflicted,
+    /// File type changed (e.g., file -> symlink).
+    TypeChanged,
+}
+
+/// Represents a file in the working directory.
+#[derive(Debug, Clone)]
+pub struct WorkingDirFile {
+    /// Path to the file relative to repository root.
+    pub path: PathBuf,
+    /// Status of the file.
+    pub status: WorkingDirStatus,
+    /// Whether the file is staged (in index).
+    pub is_staged: bool,
 }
 
 /// High-level Git repository wrapper.
@@ -175,9 +235,221 @@ impl GitRepository {
         &self.path
     }
 
+    /// Get working directory status (changed files).
+    ///
+    /// Returns a list of all files that differ from HEAD, including:
+    /// - Modified files (staged or unstaged)
+    /// - New files (tracked or untracked)
+    /// - Deleted files
+    /// - Renamed files
+    /// - Conflicted files
+    ///
+    /// Uses git2 for this operation as it provides excellent status API.
+    #[instrument(skip(self))]
+    pub fn get_working_dir_status(&self) -> Result<Vec<WorkingDirFile>, GitError> {
+        let start = std::time::Instant::now();
+
+        let mut options = git2::StatusOptions::new();
+        options
+            .include_untracked(true)
+            .recurse_untracked_dirs(true)
+            .include_ignored(false);
+
+        let statuses = self.git2_repo.statuses(Some(&mut options))?;
+        let mut files = Vec::new();
+
+        for entry in statuses.iter() {
+            let path = entry.path()
+                .ok_or_else(|| GitError::OperationFailed("Invalid UTF-8 in file path".to_string()))?;
+            let status = entry.status();
+
+            // Check if file is staged (in index)
+            let is_staged = status.intersects(
+                git2::Status::INDEX_NEW |
+                git2::Status::INDEX_MODIFIED |
+                git2::Status::INDEX_DELETED |
+                git2::Status::INDEX_RENAMED |
+                git2::Status::INDEX_TYPECHANGE
+            );
+
+            // Determine the file status
+            // Prioritize working tree changes over index changes for display
+            let file_status = if status.contains(git2::Status::CONFLICTED) {
+                Some(WorkingDirStatus::Conflicted)
+            } else if status.contains(git2::Status::WT_NEW) {
+                Some(WorkingDirStatus::Untracked)
+            } else if status.contains(git2::Status::WT_MODIFIED) || status.contains(git2::Status::INDEX_MODIFIED) {
+                Some(WorkingDirStatus::Modified)
+            } else if status.contains(git2::Status::WT_DELETED) || status.contains(git2::Status::INDEX_DELETED) {
+                Some(WorkingDirStatus::Deleted)
+            } else if status.contains(git2::Status::WT_RENAMED) || status.contains(git2::Status::INDEX_RENAMED) {
+                Some(WorkingDirStatus::Renamed)
+            } else if status.contains(git2::Status::WT_TYPECHANGE) || status.contains(git2::Status::INDEX_TYPECHANGE) {
+                Some(WorkingDirStatus::TypeChanged)
+            } else if status.contains(git2::Status::INDEX_NEW) {
+                // New file in index (staged)
+                Some(WorkingDirStatus::Modified) // Treat as modified since it's new
+            } else {
+                None // Ignore other statuses (like ignored files)
+            };
+
+            if let Some(status) = file_status {
+                files.push(WorkingDirFile {
+                    path: PathBuf::from(path),
+                    status,
+                    is_staged,
+                });
+            }
+        }
+
+        let elapsed = start.elapsed();
+        tracing::info!(
+            "get_working_dir_status completed: {} files in {:?}",
+            files.len(),
+            elapsed
+        );
+        Ok(files)
+    }
+
+    /// Stage a file (add it to the index).
+    #[instrument(skip(self))]
+    pub fn stage_file(&self, path: &std::path::Path) -> Result<(), GitError> {
+        let mut index = self.git2_repo.index()?;
+        index.add_path(path)?;
+        index.write()?;
+        tracing::debug!("Staged file: {}", path.display());
+        Ok(())
+    }
+
+    /// Unstage a file (remove it from the index, but keep working directory changes).
+    #[instrument(skip(self))]
+    pub fn unstage_file(&self, path: &std::path::Path) -> Result<(), GitError> {
+        // Use git reset HEAD <path> to unstage
+        let obj = self.git2_repo.revparse_single("HEAD")?;
+        self.git2_repo.reset_default(Some(&obj), &[path])?;
+
+        tracing::debug!("Unstaged file: {}", path.display());
+        Ok(())
+    }
+
+    /// Stage all changes in the working directory.
+    /// Optimized for large numbers of files by using chunked operations.
+    #[instrument(skip(self))]
+    pub fn stage_all(&self) -> Result<(), GitError> {
+        tracing::debug!("Starting stage_all operation");
+
+        // Get list of unstaged files
+        let files = self.get_working_dir_status()?;
+        let unstaged_paths: Vec<_> = files
+            .iter()
+            .filter(|f| !f.is_staged)
+            .map(|f| f.path.clone())
+            .collect();
+
+        if unstaged_paths.is_empty() {
+            tracing::debug!("No unstaged files to stage");
+            return Ok(());
+        }
+
+        tracing::debug!("Found {} unstaged files", unstaged_paths.len());
+
+        // Use batch staging for efficiency
+        self.stage_files_batch(&unstaged_paths)?;
+
+        tracing::debug!("Staged all changes successfully");
+        Ok(())
+    }
+
+    /// Stage multiple files in optimized batches.
+    /// This is more efficient than staging files one by one.
+    #[instrument(skip(self, paths))]
+    pub fn stage_files_batch(&self, paths: &[std::path::PathBuf]) -> Result<(), GitError> {
+        if paths.is_empty() {
+            return Ok(());
+        }
+
+        tracing::debug!("Staging {} files in batch", paths.len());
+
+        let mut index = self.git2_repo.index()?;
+
+        // Process files in chunks to avoid memory issues with very large batches
+        const CHUNK_SIZE: usize = 500;
+
+        for (chunk_idx, chunk) in paths.chunks(CHUNK_SIZE).enumerate() {
+            tracing::debug!("Processing chunk {} ({} files)", chunk_idx + 1, chunk.len());
+
+            for path in chunk {
+                index.add_path(path)?;
+            }
+
+            // Write index after each chunk to commit progress
+            index.write()?;
+
+            tracing::debug!("Completed chunk {} of {}", chunk_idx + 1, (paths.len() + CHUNK_SIZE - 1) / CHUNK_SIZE);
+        }
+
+        tracing::debug!("Staged {} files successfully", paths.len());
+        Ok(())
+    }
+
+    /// Unstage multiple files in optimized batches.
+    #[instrument(skip(self, paths))]
+    pub fn unstage_files_batch(&self, paths: &[std::path::PathBuf]) -> Result<(), GitError> {
+        if paths.is_empty() {
+            return Ok(());
+        }
+
+        tracing::debug!("Unstaging {} files in batch", paths.len());
+
+        // Process in chunks
+        const CHUNK_SIZE: usize = 500;
+
+        for (chunk_idx, chunk) in paths.chunks(CHUNK_SIZE).enumerate() {
+            tracing::debug!("Processing chunk {} ({} files)", chunk_idx + 1, chunk.len());
+
+            let obj = self.git2_repo.revparse_single("HEAD")?;
+            self.git2_repo.reset_default(Some(&obj), chunk)?;
+
+            tracing::debug!("Completed chunk {} of {}", chunk_idx + 1, (paths.len() + CHUNK_SIZE - 1) / CHUNK_SIZE);
+        }
+
+        tracing::debug!("Unstaged {} files successfully", paths.len());
+        Ok(())
+    }
+
+    /// Unstage all changes (reset index to match HEAD).
+    /// Optimized for large numbers of files by using chunked operations.
+    #[instrument(skip(self))]
+    pub fn unstage_all(&self) -> Result<(), GitError> {
+        tracing::debug!("Starting unstage_all operation");
+
+        // Get list of staged files
+        let files = self.get_working_dir_status()?;
+        let staged_paths: Vec<_> = files
+            .iter()
+            .filter(|f| f.is_staged)
+            .map(|f| f.path.clone())
+            .collect();
+
+        if staged_paths.is_empty() {
+            tracing::debug!("No staged files to unstage");
+            return Ok(());
+        }
+
+        tracing::debug!("Found {} staged files", staged_paths.len());
+
+        // Use batch unstaging for efficiency
+        self.unstage_files_batch(&staged_paths)?;
+
+        tracing::debug!("Unstaged all changes successfully");
+        Ok(())
+    }
+
     /// Get commit history starting from HEAD.
     #[instrument(skip(self))]
     pub fn get_commit_history(&self, limit: Option<usize>) -> Result<Vec<Commit>, GitError> {
+        let start = std::time::Instant::now();
+
         let head = self.gix_repo.head()
             .map_err(|e| GitError::RefNotFound(format!("Cannot get HEAD: {}", e)))?;
 
@@ -200,7 +472,12 @@ impl GitRepository {
             commits.push(self.parse_commit(&commit_obj)?);
         }
 
-        tracing::debug!("Retrieved {} commits", commits.len());
+        let elapsed = start.elapsed();
+        tracing::info!(
+            "get_commit_history completed: {} commits in {:?}",
+            commits.len(),
+            elapsed
+        );
         Ok(commits)
     }
 
@@ -219,64 +496,221 @@ impl GitRepository {
     /// Get the diff for a specific commit compared to its first parent.
     #[instrument(skip(self))]
     pub fn get_commit_diff(&self, hash: &str) -> Result<Vec<FileDiff>, GitError> {
-        use gix::object::tree::diff::Action;
+        let start = std::time::Instant::now();
 
-        let oid = gix::ObjectId::from_hex(hash.as_bytes())
-            .map_err(|e| GitError::OperationFailed(format!("Invalid hash: {}", e)))?;
+        // Use git2 for diff generation (better patch support than gix)
+        let oid = git2::Oid::from_str(hash)?;
+        let commit = self.git2_repo.find_commit(oid)?;
 
-        let commit = self.gix_repo.find_commit(oid)
-            .map_err(|e| GitError::OperationFailed(format!("Cannot find commit: {}", e)))?;
+        let commit_tree = commit.tree()?;
 
-        let commit_tree = commit.tree()
-            .map_err(|e| GitError::OperationFailed(format!("Cannot get commit tree: {}", e)))?;
-
-        // Get parent tree (or empty tree if this is the root commit)
-        let parent_tree = if let Some(parent_id) = commit.parent_ids().next() {
-            let parent = self.gix_repo.find_commit(parent_id)
-                .map_err(|e| GitError::OperationFailed(format!("Cannot find parent: {}", e)))?;
-            Some(parent.tree()
-                .map_err(|e| GitError::OperationFailed(format!("Cannot get parent tree: {}", e)))?)
+        // Get parent tree (or None for root commit)
+        let parent_tree = if commit.parent_count() > 0 {
+            Some(commit.parent(0)?.tree()?)
         } else {
             None
         };
 
-        let mut diffs = Vec::new();
+        // Create diff between parent and current commit
+        let diff = self.git2_repo.diff_tree_to_tree(
+            parent_tree.as_ref(),
+            Some(&commit_tree),
+            None,
+        )?;
 
-        // For now, we'll provide a simplified diff that shows changed files
-        // Full line-by-line diff will be added in future phases
+        let mut file_diffs = Vec::new();
 
-        // Use gix to get the tree differences
-        if let Some(parent_tree) = parent_tree {
-            parent_tree.changes()
-                .map_err(|e| GitError::OperationFailed(format!("Cannot compute changes: {}", e)))?
-                .for_each_to_obtain_tree(&commit_tree, |change| {
-                    let path = String::from_utf8_lossy(change.location).to_string();
+        // Process each delta (changed file)
+        for (delta_idx, delta) in diff.deltas().enumerate() {
+            let path = delta.new_file().path()
+                .or_else(|| delta.old_file().path())
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|| "<unknown>".to_string());
 
-                    let status = match change.event {
-                        gix::object::tree::diff::change::Event::Addition { .. } => FileStatus::Added,
-                        gix::object::tree::diff::change::Event::Deletion { .. } => FileStatus::Deleted,
-                        gix::object::tree::diff::change::Event::Modification { .. } => FileStatus::Modified,
-                        gix::object::tree::diff::change::Event::Rewrite { .. } => FileStatus::Modified,
-                    };
+            let status = match delta.status() {
+                git2::Delta::Added => FileStatus::Added,
+                git2::Delta::Deleted => FileStatus::Deleted,
+                git2::Delta::Modified => FileStatus::Modified,
+                git2::Delta::Renamed => FileStatus::Renamed,
+                git2::Delta::Copied => FileStatus::Copied,
+                _ => FileStatus::Modified,
+            };
 
-                    diffs.push(FileDiff {
-                        path,
-                        status,
-                        additions: 0,  // Will be implemented with full diff
-                        deletions: 0,  // Will be implemented with full diff
+            let mut hunks = Vec::new();
+            let mut additions = 0;
+            let mut deletions = 0;
+
+            // Generate patch for this file
+            let patch = git2::Patch::from_diff(&diff, delta_idx)?;
+
+            if let Some(patch) = patch {
+                // Process each hunk in the patch
+                for hunk_idx in 0..patch.num_hunks() {
+                    let (hunk, hunk_lines_count) = patch.hunk(hunk_idx)?;
+
+                    let mut hunk_lines = Vec::new();
+
+                    // Process each line in the hunk
+                    for line_idx in 0..hunk_lines_count {
+                        let line = patch.line_in_hunk(hunk_idx, line_idx)?;
+
+                        let (line_type, old_line_num, new_line_num) = match line.origin() {
+                            '+' => {
+                                additions += 1;
+                                (DiffLineType::Addition, None, line.new_lineno())
+                            },
+                            '-' => {
+                                deletions += 1;
+                                (DiffLineType::Deletion, line.old_lineno(), None)
+                            },
+                            ' ' => {
+                                (DiffLineType::Context, line.old_lineno(), line.new_lineno())
+                            },
+                            _ => continue, // Skip other line types (headers, etc.)
+                        };
+
+                        let content = String::from_utf8_lossy(line.content()).to_string();
+
+                        hunk_lines.push(DiffLine {
+                            line_type,
+                            content,
+                            old_line_number: old_line_num.map(|n| n as usize),
+                            new_line_number: new_line_num.map(|n| n as usize),
+                        });
+                    }
+
+                    hunks.push(DiffHunk {
+                        old_start: hunk.old_start() as usize,
+                        old_lines: hunk.old_lines() as usize,
+                        new_start: hunk.new_start() as usize,
+                        new_lines: hunk.new_lines() as usize,
+                        lines: hunk_lines,
                     });
+                }
+            }
 
-                    Ok::<_, std::convert::Infallible>(Action::Continue)
-                })
-                .map_err(|e| GitError::OperationFailed(format!("Cannot compute diff: {}", e)))?;
-        } else {
-            // Root commit - all files are additions
-            // For now, we'll skip enumerating all files in root commit
-            tracing::debug!("Root commit - skipping file enumeration");
+            file_diffs.push(FileDiff {
+                path,
+                status,
+                additions,
+                deletions,
+                hunks,
+            });
         }
 
-        tracing::debug!("Found {} changed files", diffs.len());
-        Ok(diffs)
+        let elapsed = start.elapsed();
+        tracing::info!(
+            "get_commit_diff completed: {} files in {:?}",
+            file_diffs.len(),
+            elapsed
+        );
+        Ok(file_diffs)
+    }
+
+    /// Get author identity from git config.
+    ///
+    /// Returns (name, email) tuple from user.name and user.email config.
+    /// Falls back to a default if config is missing.
+    #[instrument(skip(self))]
+    pub fn get_author_identity(&self) -> Result<(String, String), GitError> {
+        let config = self.git2_repo.config()?;
+
+        // Try to get user.name
+        let name = match config.get_string("user.name") {
+            Ok(name) => name,
+            Err(_) => {
+                tracing::warn!("user.name not set in git config, using fallback");
+                whoami::username()
+            }
+        };
+
+        // Try to get user.email
+        let email = match config.get_string("user.email") {
+            Ok(email) => email,
+            Err(_) => {
+                tracing::warn!("user.email not set in git config, using fallback");
+                let hostname = whoami::fallible::hostname().unwrap_or_else(|_| "localhost".to_string());
+                format!("{}@{}", whoami::username(), hostname)
+            }
+        };
+
+        tracing::debug!("Author identity: {} <{}>", name, email);
+        Ok((name, email))
+    }
+
+    /// Check if there are staged changes ready to commit.
+    ///
+    /// Returns true if the index differs from HEAD.
+    #[instrument(skip(self))]
+    pub fn has_staged_changes(&self) -> Result<bool, GitError> {
+        // Get HEAD tree
+        let head = self.git2_repo.head()?;
+        let head_tree = head.peel_to_tree()?;
+
+        // Get index
+        let mut index = self.git2_repo.index()?;
+        let index_tree_oid = index.write_tree()?;
+        let index_tree = self.git2_repo.find_tree(index_tree_oid)?;
+
+        // Compare trees
+        let diff = self.git2_repo.diff_tree_to_tree(
+            Some(&head_tree),
+            Some(&index_tree),
+            None,
+        )?;
+
+        let has_changes = diff.deltas().len() > 0;
+        tracing::debug!("Has staged changes: {}", has_changes);
+        Ok(has_changes)
+    }
+
+    /// Create a commit with the current staged changes.
+    ///
+    /// Returns the commit hash as a string.
+    #[instrument(skip(self, message))]
+    pub fn create_commit(&self, message: &str) -> Result<String, GitError> {
+        // Validate message
+        if message.trim().is_empty() {
+            return Err(GitError::OperationFailed(
+                "Commit message cannot be empty".to_string()
+            ));
+        }
+
+        // Check for staged changes
+        if !self.has_staged_changes()? {
+            return Err(GitError::OperationFailed(
+                "No staged changes to commit".to_string()
+            ));
+        }
+
+        // Get author identity
+        let (author_name, author_email) = self.get_author_identity()?;
+
+        // Create signature for author and committer (same in this case)
+        let signature = git2::Signature::now(&author_name, &author_email)?;
+
+        // Get HEAD reference and commit
+        let head = self.git2_repo.head()?;
+        let parent_commit = head.peel_to_commit()?;
+
+        // Get tree from index
+        let mut index = self.git2_repo.index()?;
+        let tree_oid = index.write_tree()?;
+        let tree = self.git2_repo.find_tree(tree_oid)?;
+
+        // Create the commit
+        let commit_oid = self.git2_repo.commit(
+            Some("HEAD"),           // Update HEAD
+            &signature,             // Author
+            &signature,             // Committer
+            message,                // Commit message
+            &tree,                  // Tree
+            &[&parent_commit],      // Parents
+        )?;
+
+        let commit_hash = commit_oid.to_string();
+        tracing::info!("Created commit: {}", commit_hash);
+        Ok(commit_hash)
     }
 
     /// Parse a gix commit object into our Commit struct.
