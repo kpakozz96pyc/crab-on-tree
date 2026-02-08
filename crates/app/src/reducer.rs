@@ -491,21 +491,6 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
             Effect::None
         }
 
-        AppMessage::LayoutModeToggled => {
-            state.layout_config.mode = match state.layout_config.mode {
-                crate::state::LayoutMode::Classic => crate::state::LayoutMode::FourPane,
-                crate::state::LayoutMode::FourPane => crate::state::LayoutMode::Classic,
-            };
-
-            // Update config
-            state.config.layout_mode = match state.layout_config.mode {
-                crate::state::LayoutMode::Classic => "classic".to_string(),
-                crate::state::LayoutMode::FourPane => "four_pane".to_string(),
-            };
-
-            Effect::SaveConfig
-        }
-
         AppMessage::PaneWidthsUpdated(widths) => {
             state.layout_config.pane_widths = widths;
             state.config.pane_widths = widths;

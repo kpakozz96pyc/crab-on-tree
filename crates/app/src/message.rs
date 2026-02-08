@@ -167,9 +167,6 @@ pub enum AppMessage {
     /// User changed diff view mode.
     DiffViewModeChanged(DiffViewMode),
 
-    /// User toggled layout mode.
-    LayoutModeToggled,
-
     /// Pane widths were updated.
     PaneWidthsUpdated([f32; 4]),
 }

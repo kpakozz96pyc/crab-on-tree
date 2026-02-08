@@ -4,24 +4,15 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use crabontree_git::{Commit, FileDiff, StatusSummary, WorkingDirFile, WorkingDirStatus, DiffHunk};
 
-/// Layout mode for the application.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LayoutMode {
-    Classic,
-    FourPane,
-}
-
-/// Layout configuration.
+/// Layout configuration for 4-pane mode.
 #[derive(Debug, Clone)]
 pub struct LayoutConfig {
-    pub mode: LayoutMode,
     pub pane_widths: [f32; 4],
 }
 
 impl Default for LayoutConfig {
     fn default() -> Self {
         Self {
-            mode: LayoutMode::FourPane,
             pane_widths: [0.15, 0.25, 0.20, 0.40],
         }
     }

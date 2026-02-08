@@ -23,5 +23,5 @@ pub use message::AppMessage;
 pub use reducer::reduce;
 pub use state::{
     AppState, BranchInfo, BranchTreeState, ChangedFilesState, DiffViewMode, FileTreeNode,
-    FileTreeState, FileViewState, LayoutConfig, LayoutMode, RepoState, StagingProgress, TagInfo,
+    FileTreeState, FileViewState, LayoutConfig, RepoState, StagingProgress, TagInfo,
 };
