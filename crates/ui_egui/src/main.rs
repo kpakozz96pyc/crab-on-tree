@@ -1449,7 +1449,7 @@ impl CrabOnTreeApp {
                 egui::Frame::none()
                     .fill(egui::Color32::from_rgb(30, 30, 35))
                     .show(ui, |ui| {
-                        egui::ScrollArea::vertical().show(ui, |ui| {
+                        egui::ScrollArea::vertical().id_source("pane1_branch_tree_scroll").show(ui, |ui| {
                             ui.heading("Branches & Tags");
                             ui.separator();
                             if let Some(tree) = &branch_tree {
@@ -1470,7 +1470,7 @@ impl CrabOnTreeApp {
                 egui::Frame::none()
                     .fill(egui::Color32::from_rgb(30, 30, 35))
                     .show(ui, |ui| {
-                        egui::ScrollArea::vertical().show(ui, |ui| {
+                        egui::ScrollArea::vertical().id_source("pane2_file_tree_scroll").show(ui, |ui| {
                             ui.heading("File Tree");
                             ui.separator();
                             if let Some(tree) = &file_tree {
@@ -1491,7 +1491,7 @@ impl CrabOnTreeApp {
                 egui::Frame::none()
                     .fill(egui::Color32::from_rgb(30, 30, 35))
                     .show(ui, |ui| {
-                        egui::ScrollArea::vertical().show(ui, |ui| {
+                        egui::ScrollArea::vertical().id_source("pane3_changed_files_scroll").show(ui, |ui| {
                             ui.heading("Changed Files");
                             ui.separator();
                             if let Some(files) = &changed_files {
@@ -1514,7 +1514,7 @@ impl CrabOnTreeApp {
                     egui::Frame::none()
                         .fill(egui::Color32::from_rgb(25, 25, 30))
                         .show(ui, |ui| {
-                            egui::ScrollArea::vertical().show(ui, |ui| {
+                            egui::ScrollArea::vertical().id_source("pane4_file_viewer_scroll").show(ui, |ui| {
                                 self.render_file_viewer_pane(ui, &file_view);
                             });
                         });
