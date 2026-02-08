@@ -1,8 +1,10 @@
 //! CrabOnTree - A Rust Git GUI using gitoxide and egui.
 
+mod widgets;
+
 use crabontree_app::{
     load_config, reduce, save_config, AppState, ChangedFilesState, Effect,
-    FileTreeState, FileViewState, JobExecutor,
+    FileViewState, JobExecutor,
 };
 use crabontree_ui_core::{Color, Theme};
 use eframe::egui;
@@ -43,7 +45,6 @@ fn main() -> anyhow::Result<()> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ActivePanel {
     BranchTree,
-    FileTree,
     ChangedFiles,
     FileViewer,
 }
@@ -55,8 +56,6 @@ struct CrabOnTreeApp {
     theme: Theme,
     active_panel: ActivePanel,
     show_shortcuts_help: bool,
-    // 4-pane layout state
-    pane_widths: [f32; 4],
     active_pane: usize,
 }
 
@@ -87,7 +86,6 @@ impl CrabOnTreeApp {
             theme,
             active_panel: ActivePanel::BranchTree,
             show_shortcuts_help: false,
-            pane_widths,
             active_pane: 0,
         }
     }
@@ -155,8 +153,8 @@ impl CrabOnTreeApp {
             Effect::CheckoutBranch { repo_path, branch_name } => {
                 self.executor.submit(crabontree_app::Job::CheckoutBranch { repo_path, branch_name });
             }
-            Effect::LoadFileTree(path) => {
-                self.executor.submit(crabontree_app::Job::LoadFileTree(path));
+            Effect::LoadFileTree(_path) => {
+                // File tree pane removed - ignore
             }
             Effect::LoadChangedFiles(path) => {
                 self.executor.submit(crabontree_app::Job::LoadChangedFiles(path));
@@ -196,7 +194,7 @@ impl CrabOnTreeApp {
     fn render_top_panel(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.heading("🦀 CrabOnTree");
+                ui.heading("CrabOnTree");
 
                 ui.add_space(20.0);
 
@@ -277,7 +275,7 @@ impl CrabOnTreeApp {
     }
 
     fn render_shortcuts_help(&mut self, ctx: &egui::Context) {
-        egui::Window::new("⌨️ Keyboard Shortcuts")
+        egui::Window::new("Keyboard Shortcuts")
             .open(&mut self.show_shortcuts_help)
             .resizable(false)
             .collapsible(false)
@@ -333,42 +331,36 @@ impl CrabOnTreeApp {
         let any_text_focused = ui.memory(|mem| mem.focused().is_some());
 
         if !any_text_focused {
-            // Pane selection: 1, 2, 3, 4
+            // Pane selection: 1, 2, 3 (removed file tree pane)
             if ui.input(|i| i.key_pressed(egui::Key::Num1)) {
                 self.active_pane = 0;
                 self.active_panel = ActivePanel::BranchTree;
             }
             if ui.input(|i| i.key_pressed(egui::Key::Num2)) {
                 self.active_pane = 1;
-                self.active_panel = ActivePanel::FileTree;
+                self.active_panel = ActivePanel::ChangedFiles;
             }
             if ui.input(|i| i.key_pressed(egui::Key::Num3)) {
                 self.active_pane = 2;
-                self.active_panel = ActivePanel::ChangedFiles;
-            }
-            if ui.input(|i| i.key_pressed(egui::Key::Num4)) {
-                self.active_pane = 3;
                 self.active_panel = ActivePanel::FileViewer;
             }
 
             // Tab to cycle through panes
             if ui.input(|i| i.key_pressed(egui::Key::Tab) && !i.modifiers.shift) {
-                self.active_pane = (self.active_pane + 1) % 4;
+                self.active_pane = (self.active_pane + 1) % 3;
                 self.active_panel = match self.active_pane {
                     0 => ActivePanel::BranchTree,
-                    1 => ActivePanel::FileTree,
-                    2 => ActivePanel::ChangedFiles,
+                    1 => ActivePanel::ChangedFiles,
                     _ => ActivePanel::FileViewer,
                 };
             }
 
             // Shift+Tab to cycle backward
             if ui.input(|i| i.key_pressed(egui::Key::Tab) && i.modifiers.shift) {
-                self.active_pane = if self.active_pane == 0 { 3 } else { self.active_pane - 1 };
+                self.active_pane = if self.active_pane == 0 { 2 } else { self.active_pane - 1 };
                 self.active_panel = match self.active_pane {
                     0 => ActivePanel::BranchTree,
-                    1 => ActivePanel::FileTree,
-                    2 => ActivePanel::ChangedFiles,
+                    1 => ActivePanel::ChangedFiles,
                     _ => ActivePanel::FileViewer,
                 };
             }
@@ -384,32 +376,26 @@ impl CrabOnTreeApp {
             }
         }
 
-        // Load 4-pane data on first render
-        let (need_branch_tree, need_file_tree, need_changed_files) = if let Some(repo) = &self.state.current_repo {
+        // Load 3-pane data on first render (removed file tree)
+        let (need_branch_tree, need_changed_files) = if let Some(repo) = &self.state.current_repo {
             (
                 repo.branch_tree.is_none(),
-                repo.file_tree.is_none(),
                 repo.changed_files.is_none(),
             )
         } else {
-            (false, false, false)
+            (false, false)
         };
 
         if need_branch_tree {
             self.handle_message(crabontree_app::AppMessage::LoadBranchTreeRequested);
-        }
-        if need_file_tree {
-            self.handle_message(crabontree_app::AppMessage::LoadFileTreeRequested);
         }
         if need_changed_files {
             self.handle_message(crabontree_app::AppMessage::LoadChangedFilesRequested);
         }
 
         // Clone necessary data
-        let (_branch_tree, file_tree, changed_files, file_view) = if let Some(repo) = &self.state.current_repo {
+        let (changed_files, file_view) = if let Some(repo) = &self.state.current_repo {
             (
-                repo.branch_tree.clone(),
-                repo.file_tree.clone(),
                 repo.changed_files.clone(),
                 repo.file_view.clone(),
             )
@@ -417,131 +403,66 @@ impl CrabOnTreeApp {
             return;
         };
 
-        // Horizontal 4-pane layout - capture full height first
-        let full_height = ui.available_height();
-        ui.horizontal(|ui| {
-            let available_width = ui.available_width();
-
-            // Pane 1: Branch Tree
-            let pane1_width = available_width * self.pane_widths[0];
-            ui.allocate_ui(egui::vec2(pane1_width, full_height), |ui| {
-                ui.set_min_height(full_height);
-                ui.set_max_height(full_height);
-                egui::Frame::none()
-                    .fill(egui::Color32::from_rgb(30, 30, 35))
+        // Left Panel: Commit History
+        egui::SidePanel::left("commit_history_panel")
+            .resizable(true)
+            .default_width(300.0)
+            .width_range(200.0..=600.0)
+            .show_inside(ui, |ui| {
+                // Fixed height header - exactly 40px total including separator
+                ui.add_space(10.0);
+                ui.vertical_centered(|ui| {
+                    ui.heading("Commit History");
+                });
+                ui.add_space(10.0);
+                ui.separator();
+                egui::ScrollArea::vertical()
+                    .id_source("commit_history_scroll")
                     .show(ui, |ui| {
-                        ui.vertical(|ui| {
-                            // Fixed header at top
-                            ui.add_space(5.0);
-                            ui.heading("Commit History");
-                            ui.separator();
-                            ui.add_space(5.0);
-
-                            // Scrollable content below
-                            egui::ScrollArea::vertical()
-                                .id_source("pane1_commit_history_scroll")
-                                .show(ui, |ui| {
-                                    self.render_commit_history_pane(ui);
-                                });
-                        });
+                        self.render_commit_history_pane(ui);
                     });
             });
 
-            // Separator 1
-            self.render_vertical_separator(ui, 0, available_width, full_height);
-
-            // Pane 2: File Tree
-            let pane2_width = available_width * self.pane_widths[1];
-            ui.allocate_ui(egui::vec2(pane2_width, full_height), |ui| {
-                ui.set_min_height(full_height);
-                ui.set_max_height(full_height);
-                egui::Frame::none()
-                    .fill(egui::Color32::from_rgb(30, 30, 35))
+        // Right Panel: Diff Viewer
+        egui::SidePanel::right("diff_viewer_panel")
+            .resizable(true)
+            .default_width(500.0)
+            .width_range(300.0..=800.0)
+            .show_inside(ui, |ui| {
+                // Fixed height header - exactly 40px total including separator
+                ui.add_space(10.0);
+                ui.vertical_centered(|ui| {
+                    ui.heading("Diff Viewer");
+                });
+                ui.add_space(10.0);
+                ui.separator();
+                egui::ScrollArea::vertical()
+                    .id_source("diff_viewer_scroll")
                     .show(ui, |ui| {
-                        ui.vertical(|ui| {
-                            // Fixed header at top
-                            ui.add_space(5.0);
-                            ui.heading("Changed Files");
-                            ui.separator();
-                            ui.add_space(5.0);
-
-                            // Scrollable content below
-                            egui::ScrollArea::vertical()
-                                .id_source("pane2_changed_files_scroll")
-                                .show(ui, |ui| {
-                                    if let Some(files) = &changed_files {
-                                        self.render_changed_files_pane(ui, files);
-                                    } else {
-                                        ui.label("Loading changed files...");
-                                    }
-                                });
-                        });
+                        self.render_file_viewer_pane(ui, &file_view);
                     });
             });
 
-            // Separator 2
-            self.render_vertical_separator(ui, 1, available_width, full_height);
-
-            // Pane 3: Changed Files
-            let pane3_width = available_width * self.pane_widths[2];
-            ui.allocate_ui(egui::vec2(pane3_width, full_height), |ui| {
-                ui.set_min_height(full_height);
-                ui.set_max_height(full_height);
-                egui::Frame::none()
-                    .fill(egui::Color32::from_rgb(30, 30, 35))
+        // Central Panel: Changed Files
+        egui::CentralPanel::default()
+            .show_inside(ui, |ui| {
+                // Fixed height header - exactly 40px total including separator
+                ui.add_space(10.0);
+                ui.vertical_centered(|ui| {
+                    ui.heading("Changed Files");
+                });
+                ui.add_space(10.0);
+                ui.separator();
+                egui::ScrollArea::vertical()
+                    .id_source("changed_files_scroll")
                     .show(ui, |ui| {
-                        ui.vertical(|ui| {
-                            // Fixed header at top
-                            ui.add_space(5.0);
-                            ui.heading("File Tree");
-                            ui.separator();
-                            ui.add_space(5.0);
-
-                            // Scrollable content below
-                            egui::ScrollArea::vertical()
-                                .id_source("pane3_file_tree_scroll")
-                                .show(ui, |ui| {
-                                    if let Some(tree) = &file_tree {
-                                        self.render_file_tree_pane(ui, tree);
-                                    } else {
-                                        ui.label("Loading file tree...");
-                                    }
-                                });
-                        });
+                        if let Some(files) = &changed_files {
+                            self.render_changed_files_pane(ui, files);
+                        } else {
+                            ui.label("Loading changed files...");
+                        }
                     });
             });
-
-            // Separator 3
-            self.render_vertical_separator(ui, 2, available_width, full_height);
-
-            // Pane 4: File Viewer
-            ui.allocate_ui_with_layout(
-                egui::vec2(ui.available_width(), full_height),
-                egui::Layout::top_down(egui::Align::LEFT),
-                |ui| {
-                    ui.set_min_height(full_height);
-                    ui.set_max_height(full_height);
-                    egui::Frame::none()
-                        .fill(egui::Color32::from_rgb(25, 25, 30))
-                        .show(ui, |ui| {
-                            ui.vertical(|ui| {
-                                // Fixed header at top
-                                ui.add_space(5.0);
-                                ui.heading("Diff Viewer");
-                                ui.separator();
-                                ui.add_space(5.0);
-
-                                // Scrollable content below
-                                egui::ScrollArea::vertical()
-                                    .id_source("pane4_diff_viewer_scroll")
-                                    .show(ui, |ui| {
-                                        self.render_file_viewer_pane(ui, &file_view);
-                                    });
-                            });
-                        });
-                },
-            );
-        });
     }
 
     fn render_commit_history_pane(&mut self, ui: &mut egui::Ui) {
@@ -557,6 +478,12 @@ impl CrabOnTreeApp {
             None
         };
 
+        let has_working_dir_changes = if let Some(repo) = &self.state.current_repo {
+            !repo.working_dir_files.is_empty()
+        } else {
+            false
+        };
+
         if commits.is_empty() {
             ui.vertical_centered(|ui| {
                 ui.add_space(20.0);
@@ -565,18 +492,28 @@ impl CrabOnTreeApp {
                 }
             });
         } else {
+            // Show Working Directory as first commit (0000000)
+            ui.push_id("working_directory", |ui| {
+                let is_selected = selected_commit.as_ref() == Some(&crabontree_app::WORKING_DIR_HASH.to_string());
+                let status_indicator = if has_working_dir_changes { " *" } else { "" };
+                let text = format!("0000000 - Working Directory{}", status_indicator);
+
+                if widgets::selectable_row(ui, text, is_selected) {
+                    if is_selected {
+                        self.handle_message(crabontree_app::AppMessage::CommitDeselected);
+                    } else {
+                        self.handle_message(crabontree_app::AppMessage::CommitSelected(crabontree_app::WORKING_DIR_HASH.to_string()));
+                    }
+                }
+            });
+
+            // Show regular commits
             for (idx, commit) in commits.iter().enumerate() {
                 ui.push_id(format!("commit_{}", idx), |ui| {
                     let is_selected = selected_commit.as_ref() == Some(&commit.hash);
-                    let label = format!("{} - {}",
-                        &commit.hash[..7],
-                        commit.message_summary
-                    );
+                    let text = format!("{} - {}", &commit.hash[..7], commit.message_summary);
 
-                    if ui.selectable_label(is_selected, label)
-                        .on_hover_text(&commit.hash)
-                        .clicked()
-                    {
+                    if widgets::selectable_row(ui, text, is_selected) {
                         if is_selected {
                             self.handle_message(crabontree_app::AppMessage::CommitDeselected);
                         } else {
@@ -588,113 +525,35 @@ impl CrabOnTreeApp {
         }
     }
 
-    fn render_vertical_separator(&mut self, ui: &mut egui::Ui, sep_idx: usize, total_width: f32, height: f32) {
-        let sep_width = 8.0; // Wider hit area for easier dragging
-        let visual_width = 2.0; // Thinner visual appearance
-
-        let sep_rect = egui::Rect::from_min_size(
-            ui.cursor().min - egui::vec2(sep_width / 2.0, 0.0), // Center the hit area
-            egui::vec2(sep_width, height),
-        );
-
-        let sep_id = egui::Id::new(format!("pane_separator_{}", sep_idx));
-        let response = ui.interact(sep_rect, sep_id, egui::Sense::drag());
-
-        // Change cursor to indicate draggable
-        if response.hovered() {
-            ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
-        }
-
-        if response.dragged() {
-            let delta = response.drag_delta().x / total_width;
-            // Adjust pane widths
-            if sep_idx < 3 {
-                self.pane_widths[sep_idx] = (self.pane_widths[sep_idx] + delta).max(0.05).min(0.5);
-                self.pane_widths[sep_idx + 1] = (self.pane_widths[sep_idx + 1] - delta).max(0.05).min(0.5);
-                // Normalize
-                let sum: f32 = self.pane_widths.iter().sum();
-                for w in &mut self.pane_widths {
-                    *w /= sum;
-                }
-                self.handle_message(crabontree_app::AppMessage::PaneWidthsUpdated(self.pane_widths));
-            }
-        }
-
-        // Visual separator (thinner than hit area)
-        let visual_rect = egui::Rect::from_min_size(
-            ui.cursor().min - egui::vec2(visual_width / 2.0, 0.0),
-            egui::vec2(visual_width, height),
-        );
-
-        let color = if response.hovered() || response.dragged() {
-            egui::Color32::from_rgb(100, 150, 200)
-        } else {
-            egui::Color32::from_rgb(60, 60, 65)
-        };
-
-        ui.painter().rect_filled(visual_rect, 1.0, color);
-        ui.allocate_space(egui::vec2(sep_width, 0.0));
-    }
-
-    fn render_file_tree_pane(&mut self, ui: &mut egui::Ui, tree: &FileTreeState) {
-        use crabontree_app::FileTreeNode;
-
-        fn render_node(
-            app: &mut CrabOnTreeApp,
-            ui: &mut egui::Ui,
-            node: &FileTreeNode,
-            depth: usize,
-            expanded_paths: &std::collections::HashSet<std::path::PathBuf>,
-            selected_path: &Option<std::path::PathBuf>,
-        ) {
-            let indent = "  ".repeat(depth);
-
-            match node {
-                FileTreeNode::Directory { path, name, children, .. } => {
-                    let is_expanded = expanded_paths.contains(path);
-                    let icon = if is_expanded { "📂" } else { "📁" };
-
-                    // Use path as unique ID
-                    ui.push_id(format!("dir_{}", path.display()), |ui| {
-                        if ui.selectable_label(false, format!("{}{} {}", indent, icon, name)).clicked() {
-                            app.handle_message(crabontree_app::AppMessage::FileTreeNodeToggled(path.clone()));
-                        }
-                    });
-
-                    if is_expanded {
-                        for child in children {
-                            render_node(app, ui, child, depth + 1, expanded_paths, selected_path);
-                        }
-                    }
-                }
-                FileTreeNode::File { path, name, status, .. } => {
-                    let icon = if status.is_some() { "📝" } else { "📄" };
-                    let is_selected = selected_path.as_ref() == Some(path);
-
-                    // Use path as unique ID
-                    ui.push_id(format!("file_{}", path.display()), |ui| {
-                        if ui.selectable_label(is_selected, format!("{}{} {}", indent, icon, name)).clicked() {
-                            app.handle_message(crabontree_app::AppMessage::FileTreeNodeSelected(path.clone()));
-                        }
-                    });
-                }
-            }
-        }
-
-        render_node(self, ui, &tree.root, 0, &tree.expanded_paths, &tree.selected_path);
-    }
 
     fn render_changed_files_pane(&mut self, ui: &mut egui::Ui, files: &ChangedFilesState) {
+        // Helper function to get status icon and color
+        let get_status_info = |status: &crabontree_app::WorkingDirStatus| {
+            match status {
+                crabontree_app::WorkingDirStatus::Modified => ("~", egui::Color32::from_rgb(200, 150, 0)),
+                crabontree_app::WorkingDirStatus::Deleted => ("-", egui::Color32::from_rgb(200, 0, 0)),
+                crabontree_app::WorkingDirStatus::Untracked => ("+", egui::Color32::from_rgb(0, 200, 0)),
+                crabontree_app::WorkingDirStatus::Renamed => ("R", egui::Color32::from_rgb(100, 150, 200)),
+                crabontree_app::WorkingDirStatus::Conflicted => ("!", egui::Color32::from_rgb(200, 0, 200)),
+                crabontree_app::WorkingDirStatus::TypeChanged => ("T", egui::Color32::from_rgb(150, 100, 200)),
+            }
+        };
+
         // Staged files
         if !files.staged.is_empty() {
-            egui::CollapsingHeader::new(format!("✅ Staged ({})", files.staged.len()))
+            egui::CollapsingHeader::new(format!("Staged ({})", files.staged.len()))
                 .id_source("changed_files_staged")
                 .default_open(true)
                 .show(ui, |ui| {
                     for (idx, file) in files.staged.iter().enumerate() {
                         ui.push_id(format!("staged_{}", idx), |ui| {
                             let is_selected = files.selected_file.as_ref() == Some(&file.path);
-                            if ui.selectable_label(is_selected, format!("  {}", file.path.display())).clicked() {
+                            let (status_icon, status_color) = get_status_info(&file.status);
+
+                            if ui.horizontal(|ui| {
+                                ui.colored_label(status_color, egui::RichText::new(status_icon).strong());
+                                ui.selectable_label(is_selected, file.path.display().to_string())
+                            }).inner.clicked() {
                                 self.handle_message(crabontree_app::AppMessage::ChangedFileSelected(file.path.clone()));
                             }
                         });
@@ -705,14 +564,19 @@ impl CrabOnTreeApp {
 
         // Unstaged files
         if !files.unstaged.is_empty() {
-            egui::CollapsingHeader::new(format!("📝 Unstaged ({})", files.unstaged.len()))
+            egui::CollapsingHeader::new(format!("Unstaged ({})", files.unstaged.len()))
                 .id_source("changed_files_unstaged")
                 .default_open(true)
                 .show(ui, |ui| {
                     for (idx, file) in files.unstaged.iter().enumerate() {
                         ui.push_id(format!("unstaged_{}", idx), |ui| {
                             let is_selected = files.selected_file.as_ref() == Some(&file.path);
-                            if ui.selectable_label(is_selected, format!("  {}", file.path.display())).clicked() {
+                            let (status_icon, status_color) = get_status_info(&file.status);
+
+                            if ui.horizontal(|ui| {
+                                ui.colored_label(status_color, egui::RichText::new(status_icon).strong());
+                                ui.selectable_label(is_selected, file.path.display().to_string())
+                            }).inner.clicked() {
                                 self.handle_message(crabontree_app::AppMessage::ChangedFileSelected(file.path.clone()));
                             }
                         });
@@ -723,14 +587,19 @@ impl CrabOnTreeApp {
 
         // Untracked files
         if !files.untracked.is_empty() {
-            egui::CollapsingHeader::new(format!("❓ Untracked ({})", files.untracked.len()))
+            egui::CollapsingHeader::new(format!("Untracked ({})", files.untracked.len()))
                 .id_source("changed_files_untracked")
                 .default_open(true)
                 .show(ui, |ui| {
                     for (idx, file) in files.untracked.iter().enumerate() {
                         ui.push_id(format!("untracked_{}", idx), |ui| {
                             let is_selected = files.selected_file.as_ref() == Some(&file.path);
-                            if ui.selectable_label(is_selected, format!("  {}", file.path.display())).clicked() {
+                            let (status_icon, status_color) = get_status_info(&file.status);
+
+                            if ui.horizontal(|ui| {
+                                ui.colored_label(status_color, egui::RichText::new(status_icon).strong());
+                                ui.selectable_label(is_selected, file.path.display().to_string())
+                            }).inner.clicked() {
                                 self.handle_message(crabontree_app::AppMessage::ChangedFileSelected(file.path.clone()));
                             }
                         });
@@ -741,14 +610,19 @@ impl CrabOnTreeApp {
 
         // Conflicted files
         if !files.conflicted.is_empty() {
-            egui::CollapsingHeader::new(format!("⚠ Conflicted ({})", files.conflicted.len()))
+            egui::CollapsingHeader::new(format!("Conflicted ({})", files.conflicted.len()))
                 .id_source("changed_files_conflicted")
                 .default_open(true)
                 .show(ui, |ui| {
                     for (idx, file) in files.conflicted.iter().enumerate() {
                         ui.push_id(format!("conflicted_{}", idx), |ui| {
                             let is_selected = files.selected_file.as_ref() == Some(&file.path);
-                            if ui.selectable_label(is_selected, format!("  {}", file.path.display())).clicked() {
+                            let (status_icon, status_color) = get_status_info(&file.status);
+
+                            if ui.horizontal(|ui| {
+                                ui.colored_label(status_color, egui::RichText::new(status_icon).strong());
+                                ui.selectable_label(is_selected, file.path.display().to_string())
+                            }).inner.clicked() {
                                 self.handle_message(crabontree_app::AppMessage::ChangedFileSelected(file.path.clone()));
                             }
                         });
@@ -758,47 +632,7 @@ impl CrabOnTreeApp {
     }
 
     fn render_file_viewer_pane(&mut self, ui: &mut egui::Ui, state: &FileViewState) {
-        // Check if we have a selected commit to show
-        let (selected_commit, commit_diff) = if let Some(repo) = &self.state.current_repo {
-            (repo.selected_commit.clone(), repo.commit_diff.clone())
-        } else {
-            (None, None)
-        };
-
-        // Show commit diff if a commit is selected
-        if let (Some(commit_hash), Some(diff)) = (selected_commit, commit_diff) {
-            ui.heading(format!("Commit: {}", &commit_hash[..7]));
-            ui.separator();
-            ui.add_space(5.0);
-
-            if diff.is_empty() {
-                ui.label("No changes in this commit");
-            } else {
-                ui.label(format!("{} file(s) changed", diff.len()));
-                ui.add_space(10.0);
-
-                egui::ScrollArea::vertical().id_source("commit_diff_files_scroll").show(ui, |ui| {
-                    for (idx, file_diff) in diff.iter().enumerate() {
-                        ui.push_id(format!("commit_file_{}", idx), |ui| {
-                            let (status_symbol, status_color) = match file_diff.status {
-                                crabontree_app::FileStatus::Added => ("+", egui::Color32::from_rgb(0, 200, 0)),
-                                crabontree_app::FileStatus::Modified => ("~", egui::Color32::from_rgb(200, 150, 0)),
-                                crabontree_app::FileStatus::Deleted => ("-", egui::Color32::from_rgb(200, 0, 0)),
-                                _ => ("•", egui::Color32::from_rgb(150, 150, 150)),
-                            };
-
-                            ui.horizontal(|ui| {
-                                ui.colored_label(status_color, egui::RichText::new(status_symbol).strong());
-                                ui.label(&file_diff.path);
-                            });
-                        });
-                    }
-                });
-            }
-            return;
-        }
-
-        // Otherwise show file view
+        // Show file view based on state
         match state {
             FileViewState::None => {
                 ui.vertical_centered(|ui| {
@@ -889,12 +723,14 @@ impl eframe::App for CrabOnTreeApp {
             self.render_shortcuts_help(ctx);
         }
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            if self.state.current_repo.is_some() {
-                self.render_repository_view(ui);
-            } else {
-                self.render_welcome_view(ui);
-            }
-        });
+        egui::CentralPanel::default()
+            .frame(egui::Frame::none().inner_margin(egui::Margin::same(10.0)))
+            .show(ctx, |ui| {
+                if self.state.current_repo.is_some() {
+                    self.render_repository_view(ui);
+                } else {
+                    self.render_welcome_view(ui);
+                }
+            });
     }
 }
