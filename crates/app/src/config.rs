@@ -16,7 +16,7 @@ pub struct AppConfig {
     pub max_recent: usize,
 
     #[serde(default = "default_pane_widths")]
-    pub pane_widths: [f32; 4],
+    pub pane_widths: [f32; 3],
 }
 
 fn default_theme() -> String {
@@ -27,8 +27,8 @@ fn default_max_recent() -> usize {
     10
 }
 
-fn default_pane_widths() -> [f32; 4] {
-    [0.15, 0.25, 0.20, 0.40]
+fn default_pane_widths() -> [f32; 3] {
+    [0.25, 0.35, 0.40] // Commit History, Changed Files, Diff Viewer
 }
 
 impl Default for AppConfig {

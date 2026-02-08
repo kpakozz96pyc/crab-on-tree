@@ -168,5 +168,5 @@ pub enum AppMessage {
     DiffViewModeChanged(DiffViewMode),
 
     /// Pane widths were updated.
-    PaneWidthsUpdated([f32; 4]),
+    PaneWidthsUpdated([f32; 3]),
 }

@@ -107,10 +107,18 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
             if let Some(repo) = &mut state.current_repo {
                 repo.selected_commit = Some(hash.clone());
                 repo.commit_diff = None; // Clear previous diff
-                state.loading = true;
-                Effect::LoadCommitDiff {
-                    repo_path: repo.path.clone(),
-                    commit_hash: hash,
+
+                // Check if selecting working directory or a real commit
+                if hash == crate::WORKING_DIR_HASH {
+                    // For working directory, update changed files to show working dir files
+                    Effect::LoadChangedFiles(repo.path.clone())
+                } else {
+                    // For regular commit, load commit diff
+                    state.loading = true;
+                    Effect::LoadCommitDiff {
+                        repo_path: repo.path.clone(),
+                        commit_hash: hash,
+                    }
                 }
             } else {
                 Effect::None
@@ -121,6 +129,7 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
             if let Some(repo) = &mut state.current_repo {
                 repo.selected_commit = None;
                 repo.commit_diff = None;
+                repo.changed_files = None; // Clear changed files view
             }
             Effect::None
         }
@@ -130,8 +139,44 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
             if let Some(repo) = &mut state.current_repo {
                 // Only update if this is still the selected commit
                 if repo.selected_commit.as_ref() == Some(&commit_hash) {
-                    repo.commit_diff = Some(diff);
+                    repo.commit_diff = Some(diff.clone());
                     tracing::info!("Loaded diff for commit {}", commit_hash);
+
+                    // Convert commit diff to changed files format
+                    use std::path::PathBuf;
+                    use crate::state::ChangedFilesState;
+                    use crate::WorkingDirFile;
+                    use crate::WorkingDirStatus;
+
+                    let mut changed_files = ChangedFilesState {
+                        staged: Vec::new(),
+                        unstaged: Vec::new(),
+                        untracked: Vec::new(),
+                        conflicted: Vec::new(),
+                        selected_file: None,
+                    };
+
+                    // Convert FileDiff entries to WorkingDirFile entries
+                    // All files in a commit are "staged" (committed)
+                    for file_diff in &diff {
+                        let status = match file_diff.status {
+                            crate::FileStatus::Modified => WorkingDirStatus::Modified,
+                            crate::FileStatus::Added => WorkingDirStatus::Untracked, // Show as added
+                            crate::FileStatus::Deleted => WorkingDirStatus::Deleted,
+                            crate::FileStatus::Renamed => WorkingDirStatus::Renamed,
+                            crate::FileStatus::Copied => WorkingDirStatus::Modified,
+                        };
+
+                        let working_dir_file = WorkingDirFile {
+                            path: PathBuf::from(&file_diff.path),
+                            status,
+                            is_staged: true, // All files in commit are "committed"
+                        };
+
+                        changed_files.staged.push(working_dir_file);
+                    }
+
+                    repo.changed_files = Some(changed_files);
                 }
             }
             Effect::None
@@ -412,11 +457,41 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
                     files.selected_file = Some(path.clone());
                 }
 
-                // Load file diff
-                state.loading = true;
-                Effect::LoadFileDiff {
-                    repo_path: repo.path.clone(),
-                    file_path: path,
+                // Check if we're viewing a commit or working directory
+                let is_viewing_commit = repo.selected_commit.as_ref()
+                    .map(|hash| hash != crate::WORKING_DIR_HASH)
+                    .unwrap_or(false);
+
+                if is_viewing_commit {
+                    // For commits, use the already-loaded commit diff
+                    if let Some(commit_diff) = &repo.commit_diff {
+                        // Find the file in the commit diff
+                        let path_str = path.to_string_lossy();
+                        if let Some(file_diff) = commit_diff.iter()
+                            .find(|fd| fd.path == path_str)
+                        {
+                            // Set the file view to show the diff
+                            repo.file_view = crate::state::FileViewState::Diff {
+                                path: path.clone(),
+                                hunks: file_diff.hunks.clone(),
+                                view_mode: crate::state::DiffViewMode::Unified,
+                            };
+                            Effect::None
+                        } else {
+                            // File not found in commit diff
+                            Effect::None
+                        }
+                    } else {
+                        // No commit diff loaded yet
+                        Effect::None
+                    }
+                } else {
+                    // For working directory, load file diff
+                    state.loading = true;
+                    Effect::LoadFileDiff {
+                        repo_path: repo.path.clone(),
+                        file_path: path,
+                    }
                 }
             } else {
                 Effect::None

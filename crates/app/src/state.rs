@@ -4,16 +4,16 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use crabontree_git::{Commit, FileDiff, StatusSummary, WorkingDirFile, WorkingDirStatus, DiffHunk};
 
-/// Layout configuration for 4-pane mode.
+/// Layout configuration for 3-pane mode.
 #[derive(Debug, Clone)]
 pub struct LayoutConfig {
-    pub pane_widths: [f32; 4],
+    pub pane_widths: [f32; 3],
 }
 
 impl Default for LayoutConfig {
     fn default() -> Self {
         Self {
-            pane_widths: [0.15, 0.25, 0.20, 0.40],
+            pane_widths: [0.25, 0.35, 0.40], // Commit History, Changed Files, Diff Viewer
         }
     }
 }
