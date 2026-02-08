@@ -529,14 +529,21 @@ impl CrabOnTreeApp {
     }
 
     fn render_vertical_separator(&mut self, ui: &mut egui::Ui, sep_idx: usize, total_width: f32, height: f32) {
-        let sep_width = 4.0;
+        let sep_width = 8.0; // Wider hit area for easier dragging
+        let visual_width = 2.0; // Thinner visual appearance
+
         let sep_rect = egui::Rect::from_min_size(
-            ui.cursor().min,
+            ui.cursor().min - egui::vec2(sep_width / 2.0, 0.0), // Center the hit area
             egui::vec2(sep_width, height),
         );
 
         let sep_id = egui::Id::new(format!("pane_separator_{}", sep_idx));
         let response = ui.interact(sep_rect, sep_id, egui::Sense::drag());
+
+        // Change cursor to indicate draggable
+        if response.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+        }
 
         if response.dragged() {
             let delta = response.drag_delta().x / total_width;
@@ -553,17 +560,75 @@ impl CrabOnTreeApp {
             }
         }
 
+        // Visual separator (thinner than hit area)
+        let visual_rect = egui::Rect::from_min_size(
+            ui.cursor().min - egui::vec2(visual_width / 2.0, 0.0),
+            egui::vec2(visual_width, height),
+        );
+
         let color = if response.hovered() || response.dragged() {
             egui::Color32::from_rgb(100, 150, 200)
         } else {
-            egui::Color32::from_rgb(50, 50, 55)
+            egui::Color32::from_rgb(60, 60, 65)
         };
 
-        ui.painter().rect_filled(sep_rect, 0.0, color);
+        ui.painter().rect_filled(visual_rect, 1.0, color);
         ui.allocate_space(egui::vec2(sep_width, 0.0));
     }
 
     fn render_branch_tree_pane(&mut self, ui: &mut egui::Ui, tree: &BranchTreeState) {
+        // Commit History section
+        let commits = if let Some(repo) = &self.state.current_repo {
+            repo.commits.clone()
+        } else {
+            Vec::new()
+        };
+
+        let selected_commit = if let Some(repo) = &self.state.current_repo {
+            repo.selected_commit.clone()
+        } else {
+            None
+        };
+
+        egui::CollapsingHeader::new(format!("📜 Commit History ({})", commits.len()))
+            .id_source("commit_history_section")
+            .default_open(true)
+            .show(ui, |ui| {
+                if commits.is_empty() {
+                    if ui.button("Load Commit History").clicked() {
+                        self.handle_message(crabontree_app::AppMessage::LoadCommitHistoryRequested);
+                    }
+                } else {
+                    egui::ScrollArea::vertical()
+                        .id_source("commit_history_list")
+                        .max_height(300.0)
+                        .show(ui, |ui| {
+                            for (idx, commit) in commits.iter().enumerate() {
+                                ui.push_id(format!("commit_{}", idx), |ui| {
+                                    let is_selected = selected_commit.as_ref() == Some(&commit.hash);
+                                    let label = format!("{} - {}",
+                                        &commit.hash[..7],
+                                        commit.message_summary
+                                    );
+
+                                    if ui.selectable_label(is_selected, label)
+                                        .on_hover_text(&commit.hash)
+                                        .clicked()
+                                    {
+                                        if is_selected {
+                                            self.handle_message(crabontree_app::AppMessage::CommitDeselected);
+                                        } else {
+                                            self.handle_message(crabontree_app::AppMessage::CommitSelected(commit.hash.clone()));
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                }
+            });
+
+        ui.add_space(10.0);
+
         // Local branches section
         let local_header = egui::CollapsingHeader::new("📂 Local Branches")
             .id_source("branch_tree_local")
@@ -749,11 +814,52 @@ impl CrabOnTreeApp {
     }
 
     fn render_file_viewer_pane(&mut self, ui: &mut egui::Ui, state: &FileViewState) {
+        // Check if we have a selected commit to show
+        let (selected_commit, commit_diff) = if let Some(repo) = &self.state.current_repo {
+            (repo.selected_commit.clone(), repo.commit_diff.clone())
+        } else {
+            (None, None)
+        };
+
+        // Show commit diff if a commit is selected
+        if let (Some(commit_hash), Some(diff)) = (selected_commit, commit_diff) {
+            ui.heading(format!("Commit: {}", &commit_hash[..7]));
+            ui.separator();
+            ui.add_space(5.0);
+
+            if diff.is_empty() {
+                ui.label("No changes in this commit");
+            } else {
+                ui.label(format!("{} file(s) changed", diff.len()));
+                ui.add_space(10.0);
+
+                egui::ScrollArea::vertical().id_source("commit_diff_files_scroll").show(ui, |ui| {
+                    for (idx, file_diff) in diff.iter().enumerate() {
+                        ui.push_id(format!("commit_file_{}", idx), |ui| {
+                            let (status_symbol, status_color) = match file_diff.status {
+                                crabontree_app::FileStatus::Added => ("+", egui::Color32::from_rgb(0, 200, 0)),
+                                crabontree_app::FileStatus::Modified => ("~", egui::Color32::from_rgb(200, 150, 0)),
+                                crabontree_app::FileStatus::Deleted => ("-", egui::Color32::from_rgb(200, 0, 0)),
+                                _ => ("•", egui::Color32::from_rgb(150, 150, 150)),
+                            };
+
+                            ui.horizontal(|ui| {
+                                ui.colored_label(status_color, egui::RichText::new(status_symbol).strong());
+                                ui.label(&file_diff.path);
+                            });
+                        });
+                    }
+                });
+            }
+            return;
+        }
+
+        // Otherwise show file view
         match state {
             FileViewState::None => {
                 ui.vertical_centered(|ui| {
                     ui.add_space(100.0);
-                    ui.label("Select a file to view");
+                    ui.label("Select a file or commit to view");
                 });
             }
             FileViewState::Content { path, content, .. } => {
