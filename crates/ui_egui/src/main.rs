@@ -418,7 +418,9 @@ impl CrabOnTreeApp {
                 ui.separator();
                 egui::ScrollArea::vertical()
                     .id_source("commit_history_scroll")
+                    .auto_shrink([false, false])
                     .show(ui, |ui| {
+                        ui.set_min_width(ui.available_width());
                         self.render_commit_history_pane(ui);
                     });
             });
@@ -438,7 +440,9 @@ impl CrabOnTreeApp {
                 ui.separator();
                 egui::ScrollArea::vertical()
                     .id_source("diff_viewer_scroll")
+                    .auto_shrink([false, false])
                     .show(ui, |ui| {
+                        ui.set_min_width(ui.available_width());
                         self.render_file_viewer_pane(ui, &file_view);
                     });
             });
@@ -455,7 +459,9 @@ impl CrabOnTreeApp {
                 ui.separator();
                 egui::ScrollArea::vertical()
                     .id_source("changed_files_scroll")
+                    .auto_shrink([false, false])
                     .show(ui, |ui| {
+                        ui.set_min_width(ui.available_width());
                         if let Some(files) = &changed_files {
                             self.render_changed_files_pane(ui, files);
                         } else {
@@ -550,12 +556,13 @@ impl CrabOnTreeApp {
                             let is_selected = files.selected_file.as_ref() == Some(&file.path);
                             let (status_icon, status_color) = get_status_info(&file.status);
 
-                            if ui.horizontal(|ui| {
+                            ui.horizontal(|ui| {
+                                ui.set_min_width(ui.available_width());
                                 ui.colored_label(status_color, egui::RichText::new(status_icon).strong());
-                                ui.selectable_label(is_selected, file.path.display().to_string())
-                            }).inner.clicked() {
-                                self.handle_message(crabontree_app::AppMessage::ChangedFileSelected(file.path.clone()));
-                            }
+                                if ui.selectable_label(is_selected, file.path.display().to_string()).clicked() {
+                                    self.handle_message(crabontree_app::AppMessage::ChangedFileSelected(file.path.clone()));
+                                }
+                            });
                         });
                     }
                 });
@@ -573,12 +580,13 @@ impl CrabOnTreeApp {
                             let is_selected = files.selected_file.as_ref() == Some(&file.path);
                             let (status_icon, status_color) = get_status_info(&file.status);
 
-                            if ui.horizontal(|ui| {
+                            ui.horizontal(|ui| {
+                                ui.set_min_width(ui.available_width());
                                 ui.colored_label(status_color, egui::RichText::new(status_icon).strong());
-                                ui.selectable_label(is_selected, file.path.display().to_string())
-                            }).inner.clicked() {
-                                self.handle_message(crabontree_app::AppMessage::ChangedFileSelected(file.path.clone()));
-                            }
+                                if ui.selectable_label(is_selected, file.path.display().to_string()).clicked() {
+                                    self.handle_message(crabontree_app::AppMessage::ChangedFileSelected(file.path.clone()));
+                                }
+                            });
                         });
                     }
                 });
@@ -596,12 +604,13 @@ impl CrabOnTreeApp {
                             let is_selected = files.selected_file.as_ref() == Some(&file.path);
                             let (status_icon, status_color) = get_status_info(&file.status);
 
-                            if ui.horizontal(|ui| {
+                            ui.horizontal(|ui| {
+                                ui.set_min_width(ui.available_width());
                                 ui.colored_label(status_color, egui::RichText::new(status_icon).strong());
-                                ui.selectable_label(is_selected, file.path.display().to_string())
-                            }).inner.clicked() {
-                                self.handle_message(crabontree_app::AppMessage::ChangedFileSelected(file.path.clone()));
-                            }
+                                if ui.selectable_label(is_selected, file.path.display().to_string()).clicked() {
+                                    self.handle_message(crabontree_app::AppMessage::ChangedFileSelected(file.path.clone()));
+                                }
+                            });
                         });
                     }
                 });
@@ -619,12 +628,13 @@ impl CrabOnTreeApp {
                             let is_selected = files.selected_file.as_ref() == Some(&file.path);
                             let (status_icon, status_color) = get_status_info(&file.status);
 
-                            if ui.horizontal(|ui| {
+                            ui.horizontal(|ui| {
+                                ui.set_min_width(ui.available_width());
                                 ui.colored_label(status_color, egui::RichText::new(status_icon).strong());
-                                ui.selectable_label(is_selected, file.path.display().to_string())
-                            }).inner.clicked() {
-                                self.handle_message(crabontree_app::AppMessage::ChangedFileSelected(file.path.clone()));
-                            }
+                                if ui.selectable_label(is_selected, file.path.display().to_string()).clicked() {
+                                    self.handle_message(crabontree_app::AppMessage::ChangedFileSelected(file.path.clone()));
+                                }
+                            });
                         });
                     }
                 });
@@ -646,16 +656,20 @@ impl CrabOnTreeApp {
                 ui.add_space(5.0);
 
                 // Show file content with line numbers
-                egui::ScrollArea::both().id_source("file_content_scroll").show(ui, |ui| {
-                    for (i, line) in content.lines().enumerate() {
-                        ui.push_id(format!("content_line_{}", i), |ui| {
-                            ui.horizontal(|ui| {
-                                ui.label(egui::RichText::new(format!("{:4} ", i + 1)).monospace().weak());
-                                ui.label(egui::RichText::new(line).monospace());
+                egui::ScrollArea::both()
+                    .id_source("file_content_scroll")
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        ui.set_min_width(ui.available_width());
+                        for (i, line) in content.lines().enumerate() {
+                            ui.push_id(format!("content_line_{}", i), |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label(egui::RichText::new(format!("{:4} ", i + 1)).monospace().weak());
+                                    ui.label(egui::RichText::new(line).monospace());
+                                });
                             });
-                        });
-                    }
-                });
+                        }
+                    });
             }
             FileViewState::Diff { path, hunks, .. } => {
                 ui.heading(format!("Diff: {}", path.display()));
@@ -663,36 +677,40 @@ impl CrabOnTreeApp {
                 ui.add_space(5.0);
 
                 // Render diff hunks
-                egui::ScrollArea::both().id_source("file_diff_scroll").show(ui, |ui| {
-                    for (hunk_idx, hunk) in hunks.iter().enumerate() {
-                        ui.push_id(format!("hunk_{}", hunk_idx), |ui| {
-                            ui.label(egui::RichText::new(format!(
-                                "@@ -{},{} +{},{} @@",
-                                hunk.old_start, hunk.old_lines, hunk.new_start, hunk.new_lines
-                            )).monospace().weak());
+                egui::ScrollArea::both()
+                    .id_source("file_diff_scroll")
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        ui.set_min_width(ui.available_width());
+                        for (hunk_idx, hunk) in hunks.iter().enumerate() {
+                            ui.push_id(format!("hunk_{}", hunk_idx), |ui| {
+                                ui.label(egui::RichText::new(format!(
+                                    "@@ -{},{} +{},{} @@",
+                                    hunk.old_start, hunk.old_lines, hunk.new_start, hunk.new_lines
+                                )).monospace().weak());
 
-                            for (line_idx, line) in hunk.lines.iter().enumerate() {
-                                ui.push_id(format!("line_{}", line_idx), |ui| {
-                                    let (prefix, color) = match line.line_type {
-                                        crabontree_app::DiffLineType::Addition => ("+", egui::Color32::from_rgb(0, 200, 0)),
-                                        crabontree_app::DiffLineType::Deletion => ("-", egui::Color32::from_rgb(200, 0, 0)),
-                                        crabontree_app::DiffLineType::Context => (" ", egui::Color32::from_rgb(200, 200, 200)),
-                                    };
+                                for (line_idx, line) in hunk.lines.iter().enumerate() {
+                                    ui.push_id(format!("line_{}", line_idx), |ui| {
+                                        let (prefix, color) = match line.line_type {
+                                            crabontree_app::DiffLineType::Addition => ("+", egui::Color32::from_rgb(0, 200, 0)),
+                                            crabontree_app::DiffLineType::Deletion => ("-", egui::Color32::from_rgb(200, 0, 0)),
+                                            crabontree_app::DiffLineType::Context => (" ", egui::Color32::from_rgb(200, 200, 200)),
+                                        };
 
-                                    ui.horizontal(|ui| {
-                                        let line_num = line.old_line_number.or(line.new_line_number)
-                                            .map(|n| format!("{:4}", n))
-                                            .unwrap_or_else(|| "    ".to_string());
-                                        ui.label(egui::RichText::new(line_num).monospace().weak());
-                                        ui.colored_label(color, egui::RichText::new(format!("{}{}", prefix, line.content.trim_end())).monospace());
+                                        ui.horizontal(|ui| {
+                                            let line_num = line.old_line_number.or(line.new_line_number)
+                                                .map(|n| format!("{:4}", n))
+                                                .unwrap_or_else(|| "    ".to_string());
+                                            ui.label(egui::RichText::new(line_num).monospace().weak());
+                                            ui.colored_label(color, egui::RichText::new(format!("{}{}", prefix, line.content.trim_end())).monospace());
+                                        });
                                     });
-                                });
-                            }
+                                }
 
-                            ui.add_space(10.0);
-                        });
-                    }
-                });
+                                ui.add_space(10.0);
+                            });
+                        }
+                    });
             }
             FileViewState::Binary { path, size } => {
                 ui.vertical_centered(|ui| {
