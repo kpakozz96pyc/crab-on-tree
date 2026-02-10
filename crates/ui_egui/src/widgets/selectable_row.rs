@@ -1,5 +1,3 @@
-/// Reusable UI widgets for the CrabOnTree application
-
 /// Renders a selectable row with hover and click functionality that spans 100% width
 /// Returns true if the row was clicked
 pub fn selectable_row(
@@ -49,4 +47,3 @@ pub fn selectable_row(
 
     response.clicked()
 }
-

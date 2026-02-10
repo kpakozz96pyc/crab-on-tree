@@ -486,11 +486,24 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
                         Effect::None
                     }
                 } else {
-                    // For working directory, load file diff
+                    // For working directory, check if file is untracked (new file)
+                    let is_untracked = repo.changed_files.as_ref()
+                        .map(|files| files.untracked.iter().any(|f| f.path == path))
+                        .unwrap_or(false);
+
                     state.loading = true;
-                    Effect::LoadFileDiff {
-                        repo_path: repo.path.clone(),
-                        file_path: path,
+                    if is_untracked {
+                        // For new/untracked files, show content instead of diff
+                        Effect::LoadFileContent {
+                            repo_path: repo.path.clone(),
+                            file_path: path,
+                        }
+                    } else {
+                        // For modified/deleted files, show diff
+                        Effect::LoadFileDiff {
+                            repo_path: repo.path.clone(),
+                            file_path: path,
+                        }
                     }
                 }
             } else {
