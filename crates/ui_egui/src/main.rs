@@ -1,15 +1,14 @@
 //! CrabOnTree - A Rust Git GUI using gitoxide and egui.
 
+mod components;
 mod panes;
 mod utils;
 mod widgets;
 
-use crabontree_app::{
-    load_config, reduce, save_config, AppState, Effect, JobExecutor,
-};
-use crabontree_ui_core::{Color, Theme};
+use crabontree_app::{load_config, reduce, save_config, AppState, Effect, JobExecutor};
+use crabontree_ui_core::Theme;
 use eframe::egui;
-use utils::scroll_config;
+use utils::{keyboard, scroll_config, theme};
 
 fn main() -> anyhow::Result<()> {
     // Initialize logging
@@ -43,20 +42,12 @@ fn main() -> anyhow::Result<()> {
     .map_err(|e| anyhow::anyhow!("Failed to run application: {}", e))
 }
 
-/// Active panel for keyboard navigation
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ActivePanel {
-    BranchTree,
-    ChangedFiles,
-    FileViewer,
-}
-
 struct CrabOnTreeApp {
     state: AppState,
     executor: JobExecutor,
     message_rx: tokio::sync::mpsc::Receiver<crabontree_app::AppMessage>,
     theme: Theme,
-    active_panel: ActivePanel,
+    active_panel: keyboard::ActivePanel,
     show_shortcuts_help: bool,
     active_pane: usize,
 }
@@ -86,7 +77,7 @@ impl CrabOnTreeApp {
             executor,
             message_rx,
             theme,
-            active_panel: ActivePanel::BranchTree,
+            active_panel: keyboard::ActivePanel::BranchTree,
             show_shortcuts_help: false,
             active_pane: 0,
         }
@@ -170,211 +161,27 @@ impl CrabOnTreeApp {
         }
     }
 
-    fn apply_theme(&self, ctx: &egui::Context) {
-        let mut visuals = egui::Visuals::dark();
-
-        // Convert Color to egui::Color32
-        let to_egui = |c: Color| egui::Color32::from_rgba_premultiplied(
-            (c.r * 255.0) as u8,
-            (c.g * 255.0) as u8,
-            (c.b * 255.0) as u8,
-            (c.a * 255.0) as u8,
-        );
-
-        visuals.panel_fill = to_egui(self.theme.bg_primary);
-        visuals.extreme_bg_color = to_egui(self.theme.bg_secondary);
-        visuals.faint_bg_color = to_egui(self.theme.bg_tertiary);
-
-        visuals.override_text_color = Some(to_egui(self.theme.fg_primary));
-        visuals.hyperlink_color = to_egui(self.theme.accent_primary);
-        visuals.error_fg_color = to_egui(self.theme.error);
-        visuals.warn_fg_color = to_egui(self.theme.warning);
-
-        ctx.set_visuals(visuals);
-    }
-
-    fn render_top_panel(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                ui.heading("CrabOnTree");
-
-                ui.add_space(20.0);
-
-                if ui.button("📂 Open Repository").clicked() {
-                    if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                        self.handle_message(crabontree_app::AppMessage::OpenRepoRequested(path));
-                    }
-                }
-
-                if self.state.current_repo.is_some() {
-                    if ui.button("🔄 Refresh").clicked() {
-                        self.handle_message(crabontree_app::AppMessage::RefreshRepo);
-                    }
-
-                    if ui.button("✖ Close").clicked() {
-                        self.handle_message(crabontree_app::AppMessage::CloseRepo);
-                    }
-
-                }
-
-                // Loading spinner
-                if self.state.loading {
-                    ui.add_space(10.0);
-                    ui.spinner();
-                }
-            });
-        });
-    }
-
-    fn render_error_panel(&mut self, ctx: &egui::Context) {
-        if let Some(error) = self.state.error.clone() {
-            egui::TopBottomPanel::top("error_panel").show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    let to_egui = |c: Color| egui::Color32::from_rgba_premultiplied(
-                        (c.r * 255.0) as u8,
-                        (c.g * 255.0) as u8,
-                        (c.b * 255.0) as u8,
-                        (c.a * 255.0) as u8,
-                    );
-
-                    ui.colored_label(to_egui(self.theme.error), format!("❌ {}", error));
-
-                    if ui.button("✖").clicked() {
-                        self.handle_message(crabontree_app::AppMessage::ClearError);
-                    }
-                });
-            });
-        }
-    }
-
-    fn render_welcome_view(&mut self, ui: &mut egui::Ui) {
-        ui.vertical_centered(|ui| {
-            ui.add_space(100.0);
-            ui.heading("Welcome to CrabOnTree");
-            ui.add_space(20.0);
-            ui.label("A Git GUI written in Rust with gitoxide and egui");
-            ui.add_space(40.0);
-
-            if ui.button("📂 Open a Repository").clicked() {
-                if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                    self.handle_message(crabontree_app::AppMessage::OpenRepoRequested(path));
-                }
-            }
-
-            ui.add_space(40.0);
-
-            if !self.state.config.recent_repos.is_empty() {
-                ui.heading("Recent Repositories");
-                ui.add_space(10.0);
-
-                for repo_path in self.state.config.recent_repos.clone() {
-                    if ui.button(repo_path.display().to_string()).clicked() {
-                        self.handle_message(crabontree_app::AppMessage::OpenRepoRequested(repo_path));
-                    }
-                }
-            }
-        });
-    }
-
-    fn render_shortcuts_help(&mut self, ctx: &egui::Context) {
-        egui::Window::new("Keyboard Shortcuts")
-            .open(&mut self.show_shortcuts_help)
-            .resizable(false)
-            .collapsible(false)
-            .show(ctx, |ui| {
-                ui.heading("Navigation");
-                ui.separator();
-                ui.label("↑ / k        Previous item");
-                ui.label("↓ / j        Next item");
-                ui.label("Enter       Select/View commit");
-                ui.label("Space       Toggle staging (files)");
-                ui.label("Home        First item");
-                ui.label("End         Last item");
-                ui.label("g g         Go to top (vim-style)");
-                ui.label("Shift+G     Go to bottom (vim-style)");
-
-                ui.add_space(10.0);
-                ui.heading("Search");
-                ui.separator();
-                ui.label("/           Focus file search");
-                ui.label("Ctrl+F      Focus commit search");
-                ui.label("Esc         Clear search / Blur");
-
-                ui.add_space(10.0);
-                ui.heading("Panels");
-                ui.separator();
-                ui.label("1           Working directory");
-                ui.label("2           Commit message");
-                ui.label("3           Commit history");
-                ui.label("Tab         Cycle panels");
-
-                ui.add_space(10.0);
-                ui.heading("Actions");
-                ui.separator();
-                ui.label("c           Focus commit message");
-                ui.label("Ctrl+Enter  Create commit");
-                ui.label("a           Stage all files");
-                ui.label("u           Unstage all files");
-                ui.label("r           Refresh repository");
-
-                ui.add_space(10.0);
-                ui.heading("Help");
-                ui.separator();
-                ui.label("?           Show/hide this help");
-            });
-    }
 
     fn render_repository_view(&mut self, ui: &mut egui::Ui) {
         self.render_four_pane_layout(ui);
     }
 
     fn render_four_pane_layout(&mut self, ui: &mut egui::Ui) {
-        // Keyboard shortcuts for 4-pane layout
-        let any_text_focused = ui.memory(|mem| mem.focused().is_some());
+        // Handle keyboard shortcuts
+        let (action, new_pane, new_panel) =
+            keyboard::handle_shortcuts(ui, self.active_pane, self.active_panel);
 
-        if !any_text_focused {
-            // Pane selection: 1, 2, 3 (removed file tree pane)
-            if ui.input(|i| i.key_pressed(egui::Key::Num1)) {
-                self.active_pane = 0;
-                self.active_panel = ActivePanel::BranchTree;
-            }
-            if ui.input(|i| i.key_pressed(egui::Key::Num2)) {
-                self.active_pane = 1;
-                self.active_panel = ActivePanel::ChangedFiles;
-            }
-            if ui.input(|i| i.key_pressed(egui::Key::Num3)) {
-                self.active_pane = 2;
-                self.active_panel = ActivePanel::FileViewer;
-            }
+        self.active_pane = new_pane;
+        self.active_panel = new_panel;
 
-            // Tab to cycle through panes
-            if ui.input(|i| i.key_pressed(egui::Key::Tab) && !i.modifiers.shift) {
-                self.active_pane = (self.active_pane + 1) % 3;
-                self.active_panel = match self.active_pane {
-                    0 => ActivePanel::BranchTree,
-                    1 => ActivePanel::ChangedFiles,
-                    _ => ActivePanel::FileViewer,
-                };
-            }
-
-            // Shift+Tab to cycle backward
-            if ui.input(|i| i.key_pressed(egui::Key::Tab) && i.modifiers.shift) {
-                self.active_pane = if self.active_pane == 0 { 2 } else { self.active_pane - 1 };
-                self.active_panel = match self.active_pane {
-                    0 => ActivePanel::BranchTree,
-                    1 => ActivePanel::ChangedFiles,
-                    _ => ActivePanel::FileViewer,
-                };
-            }
-
-            // 'r' key to refresh
-            if ui.input(|i| i.key_pressed(egui::Key::R) && !i.modifiers.ctrl) {
-                self.handle_message(crabontree_app::AppMessage::RefreshRepo);
-            }
-
-            // '?' to show help
-            if ui.input(|i| i.key_pressed(egui::Key::Questionmark) || (i.key_pressed(egui::Key::Slash) && i.modifiers.shift)) {
+        match action {
+            keyboard::KeyboardAction::ToggleHelp => {
                 self.show_shortcuts_help = !self.show_shortcuts_help;
+            }
+            _ => {
+                if let Some(msg) = keyboard::action_to_message(action) {
+                    self.handle_message(msg);
+                }
             }
         }
 
@@ -501,17 +308,34 @@ impl CrabOnTreeApp {
 impl eframe::App for CrabOnTreeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_messages();
-        self.apply_theme(ctx);
+        theme::apply_theme(ctx, &self.theme);
 
         // Request continuous repaints for message polling
         ctx.request_repaint_after(std::time::Duration::from_millis(100));
 
-        self.render_top_panel(ctx);
-        self.render_error_panel(ctx);
+        // Render top panel
+        let top_action = components::top_panel::render(
+            ctx,
+            self.state.current_repo.is_some(),
+            self.state.loading,
+        );
+        if let Some(msg) = components::top_panel::action_to_message(top_action) {
+            self.handle_message(msg);
+        }
+
+        // Render error panel
+        let error_action = components::error_panel::render(
+            ctx,
+            self.state.error.as_ref(),
+            self.theme.error,
+        );
+        if let Some(msg) = components::error_panel::action_to_message(error_action) {
+            self.handle_message(msg);
+        }
 
         // Render help dialog if requested
         if self.show_shortcuts_help {
-            self.render_shortcuts_help(ctx);
+            components::shortcuts_help::render(ctx, &mut self.show_shortcuts_help);
         }
 
         egui::CentralPanel::default()
@@ -520,7 +344,13 @@ impl eframe::App for CrabOnTreeApp {
                 if self.state.current_repo.is_some() {
                     self.render_repository_view(ui);
                 } else {
-                    self.render_welcome_view(ui);
+                    let welcome_action = components::welcome_view::render(
+                        ui,
+                        &self.state.config.recent_repos,
+                    );
+                    if let Some(msg) = components::welcome_view::action_to_message(welcome_action) {
+                        self.handle_message(msg);
+                    }
                 }
             });
     }
