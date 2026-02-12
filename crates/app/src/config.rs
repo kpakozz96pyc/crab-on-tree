@@ -17,6 +17,10 @@ pub struct AppConfig {
 
     #[serde(default = "default_pane_widths")]
     pub pane_widths: [f32; 3],
+
+    /// JSON-serialized dock layout state
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub dock_layout: Option<String>,
 }
 
 fn default_theme() -> String {
@@ -38,6 +42,7 @@ impl Default for AppConfig {
             recent_repos: Vec::new(),
             max_recent: default_max_recent(),
             pane_widths: default_pane_widths(),
+            dock_layout: None,
         }
     }
 }
