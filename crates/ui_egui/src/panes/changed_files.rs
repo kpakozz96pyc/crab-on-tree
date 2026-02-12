@@ -1,26 +1,16 @@
-/// Changed files pane for displaying file changes.
-///
-/// This pane shows staged, unstaged, untracked, and conflicted files
-/// organized into collapsible sections.
-
 use crate::widgets::FileRow;
 use crabontree_app::{AppMessage, ChangedFilesState};
 use eframe::egui;
 use std::path::PathBuf;
 
-/// Action to be taken after rendering the changed files pane.
 pub enum ChangedFilesAction {
     None,
     SelectFile(PathBuf),
 }
 
-/// Renders the changed files pane.
-///
-/// Returns an action that the caller should handle (e.g., select a file).
 pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesAction {
     let mut action = ChangedFilesAction::None;
 
-    // Staged files
     if !files.staged.is_empty() {
         egui::CollapsingHeader::new(format!("Staged ({})", files.staged.len()))
             .id_source("changed_files_staged")
@@ -38,7 +28,6 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesActio
         ui.add_space(5.0);
     }
 
-    // Unstaged files
     if !files.unstaged.is_empty() {
         egui::CollapsingHeader::new(format!("Unstaged ({})", files.unstaged.len()))
             .id_source("changed_files_unstaged")
@@ -56,7 +45,6 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesActio
         ui.add_space(5.0);
     }
 
-    // Untracked files
     if !files.untracked.is_empty() {
         egui::CollapsingHeader::new(format!("Untracked ({})", files.untracked.len()))
             .id_source("changed_files_untracked")
@@ -74,7 +62,6 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesActio
         ui.add_space(5.0);
     }
 
-    // Conflicted files
     if !files.conflicted.is_empty() {
         egui::CollapsingHeader::new(format!("Conflicted ({})", files.conflicted.len()))
             .id_source("changed_files_conflicted")
@@ -94,7 +81,6 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesActio
     action
 }
 
-/// Converts a ChangedFilesAction to an AppMessage.
 pub fn action_to_message(action: ChangedFilesAction) -> Option<AppMessage> {
     match action {
         ChangedFilesAction::None => None,

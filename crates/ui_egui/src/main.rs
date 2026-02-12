@@ -8,7 +8,7 @@ mod widgets;
 use crabontree_app::{load_config, reduce, save_config, AppState, Effect, JobExecutor};
 use crabontree_ui_core::Theme;
 use eframe::egui;
-use utils::{keyboard, scroll_config, theme};
+use utils::{keyboard, theme};
 
 fn main() -> anyhow::Result<()> {
     // Initialize logging
@@ -67,9 +67,7 @@ impl CrabOnTreeApp {
             error: None,
             config,
             staging_progress: None,
-            layout_config: crabontree_app::LayoutConfig {
-                pane_widths,
-            },
+            layout_config: crabontree_app::LayoutConfig { pane_widths },
         };
 
         Self {
@@ -114,19 +112,39 @@ impl CrabOnTreeApp {
                 }
             }
             Effect::LoadCommitHistory(path) => {
-                self.executor.submit(crabontree_app::Job::LoadCommitHistory(path));
+                self.executor
+                    .submit(crabontree_app::Job::LoadCommitHistory(path));
             }
-            Effect::LoadCommitDiff { repo_path, commit_hash } => {
-                self.executor.submit(crabontree_app::Job::LoadCommitDiff { repo_path, commit_hash });
+            Effect::LoadCommitDiff {
+                repo_path,
+                commit_hash,
+            } => {
+                self.executor.submit(crabontree_app::Job::LoadCommitDiff {
+                    repo_path,
+                    commit_hash,
+                });
             }
             Effect::LoadWorkingDirStatus(path) => {
-                self.executor.submit(crabontree_app::Job::LoadWorkingDirStatus(path));
+                self.executor
+                    .submit(crabontree_app::Job::LoadWorkingDirStatus(path));
             }
-            Effect::StageFile { repo_path, file_path } => {
-                self.executor.submit(crabontree_app::Job::StageFile { repo_path, file_path });
+            Effect::StageFile {
+                repo_path,
+                file_path,
+            } => {
+                self.executor.submit(crabontree_app::Job::StageFile {
+                    repo_path,
+                    file_path,
+                });
             }
-            Effect::UnstageFile { repo_path, file_path } => {
-                self.executor.submit(crabontree_app::Job::UnstageFile { repo_path, file_path });
+            Effect::UnstageFile {
+                repo_path,
+                file_path,
+            } => {
+                self.executor.submit(crabontree_app::Job::UnstageFile {
+                    repo_path,
+                    file_path,
+                });
             }
             Effect::StageAll(path) => {
                 self.executor.submit(crabontree_app::Job::StageAll(path));
@@ -135,32 +153,53 @@ impl CrabOnTreeApp {
                 self.executor.submit(crabontree_app::Job::UnstageAll(path));
             }
             Effect::CreateCommit { repo_path, message } => {
-                self.executor.submit(crabontree_app::Job::CreateCommit { repo_path, message });
+                self.executor
+                    .submit(crabontree_app::Job::CreateCommit { repo_path, message });
             }
             Effect::LoadAuthorIdentity(path) => {
-                self.executor.submit(crabontree_app::Job::LoadAuthorIdentity(path));
+                self.executor
+                    .submit(crabontree_app::Job::LoadAuthorIdentity(path));
             }
             Effect::LoadBranchTree(path) => {
-                self.executor.submit(crabontree_app::Job::LoadBranchTree(path));
+                self.executor
+                    .submit(crabontree_app::Job::LoadBranchTree(path));
             }
-            Effect::CheckoutBranch { repo_path, branch_name } => {
-                self.executor.submit(crabontree_app::Job::CheckoutBranch { repo_path, branch_name });
+            Effect::CheckoutBranch {
+                repo_path,
+                branch_name,
+            } => {
+                self.executor.submit(crabontree_app::Job::CheckoutBranch {
+                    repo_path,
+                    branch_name,
+                });
             }
             Effect::LoadFileTree(_path) => {
                 // File tree pane removed - ignore
             }
             Effect::LoadChangedFiles(path) => {
-                self.executor.submit(crabontree_app::Job::LoadChangedFiles(path));
+                self.executor
+                    .submit(crabontree_app::Job::LoadChangedFiles(path));
             }
-            Effect::LoadFileContent { repo_path, file_path } => {
-                self.executor.submit(crabontree_app::Job::LoadFileContent { repo_path, file_path });
+            Effect::LoadFileContent {
+                repo_path,
+                file_path,
+            } => {
+                self.executor.submit(crabontree_app::Job::LoadFileContent {
+                    repo_path,
+                    file_path,
+                });
             }
-            Effect::LoadFileDiff { repo_path, file_path } => {
-                self.executor.submit(crabontree_app::Job::LoadFileDiff { repo_path, file_path });
+            Effect::LoadFileDiff {
+                repo_path,
+                file_path,
+            } => {
+                self.executor.submit(crabontree_app::Job::LoadFileDiff {
+                    repo_path,
+                    file_path,
+                });
             }
         }
     }
-
 
     fn render_repository_view(&mut self, ui: &mut egui::Ui) {
         self.render_four_pane_layout(ui);
@@ -185,12 +224,8 @@ impl CrabOnTreeApp {
             }
         }
 
-        // Load 3-pane data on first render (removed file tree)
         let (need_branch_tree, need_changed_files) = if let Some(repo) = &self.state.current_repo {
-            (
-                repo.branch_tree.is_none(),
-                repo.changed_files.is_none(),
-            )
+            (repo.branch_tree.is_none(), repo.changed_files.is_none())
         } else {
             (false, false)
         };
@@ -202,35 +237,25 @@ impl CrabOnTreeApp {
             self.handle_message(crabontree_app::AppMessage::LoadChangedFilesRequested);
         }
 
-        // Clone necessary data
         let (changed_files, file_view) = if let Some(repo) = &self.state.current_repo {
-            (
-                repo.changed_files.clone(),
-                repo.file_view.clone(),
-            )
+            (repo.changed_files.clone(), repo.file_view.clone())
         } else {
             return;
         };
 
-        // Left Panel: Commit History
         egui::SidePanel::left("commit_history_panel")
             .resizable(true)
             .default_width(300.0)
             .width_range(200.0..=600.0)
             .show_inside(ui, |ui| {
-                // Fixed height header - exactly 40px total including separator
-                ui.add_space(10.0);
-                ui.vertical_centered(|ui| {
-                    ui.heading("Commit History");
-                });
-                ui.add_space(10.0);
-                ui.separator();
-                scroll_config::vertical_scroll()
-                    .id_source("commit_history_scroll")
-                    .show(ui, |ui| {
-                        scroll_config::set_full_width(ui);
-
-                        // Get commit history data
+                ui.add_space(5.0);
+                panes::scrollable_pane::render(
+                    ui,
+                    &panes::scrollable_pane::ScrollablePaneConfig::new(
+                        "Commit History",
+                        "commit_history_scroll",
+                    ),
+                    |ui| {
                         let (commits, selected_commit, has_working_dir_changes) =
                             if let Some(repo) = &self.state.current_repo {
                                 (
@@ -242,7 +267,6 @@ impl CrabOnTreeApp {
                                 (&[][..], None, false)
                             };
 
-                        // Render and handle action
                         let action = panes::commit_history::render(
                             ui,
                             commits,
@@ -253,56 +277,48 @@ impl CrabOnTreeApp {
                         if let Some(msg) = panes::commit_history::action_to_message(action) {
                             self.handle_message(msg);
                         }
-                    });
+                    },
+                );
             });
 
-        // Right Panel: Diff Viewer
         egui::SidePanel::right("diff_viewer_panel")
             .resizable(true)
             .default_width(500.0)
             .width_range(300.0..=800.0)
             .show_inside(ui, |ui| {
-                // Fixed height header - exactly 40px total including separator
-                ui.add_space(10.0);
-                ui.vertical_centered(|ui| {
-                    ui.heading("Diff Viewer");
-                });
-                ui.add_space(10.0);
-                ui.separator();
-                scroll_config::vertical_scroll()
-                    .id_source("diff_viewer_scroll")
-                    .show(ui, |ui| {
-                        scroll_config::set_full_width(ui);
+                ui.add_space(5.0);
+                panes::scrollable_pane::render(
+                    ui,
+                    &panes::scrollable_pane::ScrollablePaneConfig::new_both_scroll(
+                        "Diff Viewer",
+                        "diff_viewer_scroll",
+                    ),
+                    |ui| {
                         panes::diff_viewer::render(ui, &file_view);
-                    });
+                    },
+                );
             });
 
-        // Central Panel: Changed Files
-        egui::CentralPanel::default()
-            .show_inside(ui, |ui| {
-                // Fixed height header - exactly 40px total including separator
-                ui.add_space(10.0);
-                ui.vertical_centered(|ui| {
-                    ui.heading("Changed Files");
-                });
-                ui.add_space(10.0);
-                ui.separator();
-                scroll_config::vertical_scroll()
-                    .id_source("changed_files_scroll")
-                    .show(ui, |ui| {
-                        scroll_config::set_full_width(ui);
-                        if let Some(files) = &changed_files {
-                            let action = panes::changed_files::render(ui, files);
-                            if let Some(msg) = panes::changed_files::action_to_message(action) {
-                                self.handle_message(msg);
-                            }
-                        } else {
-                            ui.label("Loading changed files...");
+        egui::CentralPanel::default().show_inside(ui, |ui| {
+            panes::scrollable_pane::render(
+                ui,
+                &panes::scrollable_pane::ScrollablePaneConfig::new(
+                    "Changed Files",
+                    "changed_files_scroll",
+                ),
+                |ui| {
+                    if let Some(files) = &changed_files {
+                        let action = panes::changed_files::render(ui, files);
+                        if let Some(msg) = panes::changed_files::action_to_message(action) {
+                            self.handle_message(msg);
                         }
-                    });
-            });
+                    } else {
+                        ui.label("Loading changed files...");
+                    }
+                },
+            );
+        });
     }
-
 }
 
 impl eframe::App for CrabOnTreeApp {
@@ -324,11 +340,8 @@ impl eframe::App for CrabOnTreeApp {
         }
 
         // Render error panel
-        let error_action = components::error_panel::render(
-            ctx,
-            self.state.error.as_ref(),
-            self.theme.error,
-        );
+        let error_action =
+            components::error_panel::render(ctx, self.state.error.as_ref(), self.theme.error);
         if let Some(msg) = components::error_panel::action_to_message(error_action) {
             self.handle_message(msg);
         }
@@ -344,10 +357,8 @@ impl eframe::App for CrabOnTreeApp {
                 if self.state.current_repo.is_some() {
                     self.render_repository_view(ui);
                 } else {
-                    let welcome_action = components::welcome_view::render(
-                        ui,
-                        &self.state.config.recent_repos,
-                    );
+                    let welcome_action =
+                        components::welcome_view::render(ui, &self.state.config.recent_repos);
                     if let Some(msg) = components::welcome_view::action_to_message(welcome_action) {
                         self.handle_message(msg);
                     }

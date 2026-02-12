@@ -1,13 +1,7 @@
-/// Commit history pane for displaying the commit list.
-///
-/// This pane shows the working directory as a special "commit" followed
-/// by the repository's commit history.
-
 use crate::widgets;
 use crabontree_app::{AppMessage, Commit, WORKING_DIR_HASH};
 use eframe::egui;
 
-/// Action to be taken after rendering the commit history pane.
 pub enum CommitHistoryAction {
     None,
     LoadHistory,
@@ -15,9 +9,6 @@ pub enum CommitHistoryAction {
     DeselectCommit,
 }
 
-/// Renders the commit history pane.
-///
-/// Returns an action that the caller should handle (e.g., load history, select/deselect commit).
 pub fn render(
     ui: &mut egui::Ui,
     commits: &[Commit],
@@ -36,7 +27,6 @@ pub fn render(
     } else {
         let mut action = CommitHistoryAction::None;
 
-        // Show Working Directory as first commit (0000000)
         ui.push_id("working_directory", |ui| {
             let is_selected = selected_commit == Some(&WORKING_DIR_HASH.to_string());
             let status_indicator = if has_working_dir_changes { " *" } else { "" };
@@ -51,7 +41,6 @@ pub fn render(
             }
         });
 
-        // Show regular commits
         for (idx, commit) in commits.iter().enumerate() {
             ui.push_id(format!("commit_{}", idx), |ui| {
                 let is_selected = selected_commit == Some(&commit.hash);
@@ -71,7 +60,6 @@ pub fn render(
     }
 }
 
-/// Converts a CommitHistoryAction to an AppMessage.
 pub fn action_to_message(action: CommitHistoryAction) -> Option<AppMessage> {
     match action {
         CommitHistoryAction::None => None,
