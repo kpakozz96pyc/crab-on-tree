@@ -7,6 +7,16 @@ pub enum ChangedFilesAction {
     None,
     SelectFile(PathBuf),
     ToggleStage { path: PathBuf, is_staged: bool },
+    CommitSummaryUpdated(String),
+    CommitDescriptionUpdated(String),
+    AmendLastCommitToggled(bool),
+    PushAfterCommitToggled(bool),
+    CommitChangesRequested {
+        summary: String,
+        description: String,
+        amend: bool,
+        push: bool,
+    },
 }
 
 fn render_section(
@@ -55,8 +65,8 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesActio
     let mut action = ChangedFilesAction::None;
     let selected_file = files.selected_file.as_ref();
 
-    // Render commit message section if available
-    if !files.commit_message.is_empty() {
+    // Render commit message section if available (for commit view)
+    if files.is_commit_view && !files.commit_message.is_empty() {
         egui::CollapsingHeader::new("Commit Message")
             .id_source("changed_files_commit_message")
             .default_open(true)
@@ -126,6 +136,79 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesActio
         );
     }
 
+    // Render commit panel at the bottom in working directory view
+    if !files.is_commit_view {
+        // Add vertical spacing to push commit panel to bottom
+        ui.add_space(ui.available_height() - 200.0); // Reserve space for commit panel
+
+        ui.separator();
+
+        let has_staged_files = !files.staged.is_empty();
+
+        // Commit summary
+        ui.horizontal(|ui| {
+            ui.label("Summary:");
+            let summary_len = files.commit_summary.chars().count();
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.label(format!("{}", summary_len));
+            });
+        });
+
+        let mut summary = files.commit_summary.clone();
+        let summary_response = ui.add(
+            egui::TextEdit::singleline(&mut summary)
+                .desired_width(f32::INFINITY)
+                .hint_text("Commit summary")
+        );
+        if summary_response.changed() {
+            action = ChangedFilesAction::CommitSummaryUpdated(summary);
+        }
+
+        ui.add_space(5.0);
+
+        // Commit description
+        ui.label("Description:");
+        let mut description = files.commit_description.clone();
+        let description_response = ui.add(
+            egui::TextEdit::multiline(&mut description)
+                .desired_width(f32::INFINITY)
+                .desired_rows(3)
+                .hint_text("Optional description")
+        );
+        if description_response.changed() {
+            action = ChangedFilesAction::CommitDescriptionUpdated(description);
+        }
+
+        ui.add_space(5.0);
+
+        // Checkboxes (left column) and Commit button (right side)
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                let mut amend = files.amend_last_commit;
+                if ui.checkbox(&mut amend, "Amend last commit").changed() {
+                    action = ChangedFilesAction::AmendLastCommitToggled(amend);
+                }
+
+                let mut push = files.push_after_commit;
+                if ui.checkbox(&mut push, "Push after commit").changed() {
+                    action = ChangedFilesAction::PushAfterCommitToggled(push);
+                }
+            });
+
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let commit_enabled = has_staged_files && !files.commit_summary.is_empty();
+                if ui.add_enabled(commit_enabled, egui::Button::new("Commit")).clicked() {
+                    action = ChangedFilesAction::CommitChangesRequested {
+                        summary: files.commit_summary.clone(),
+                        description: files.commit_description.clone(),
+                        amend: files.amend_last_commit,
+                        push: files.push_after_commit,
+                    };
+                }
+            });
+        });
+    }
+
     action
 }
 
@@ -139,6 +222,21 @@ pub fn action_to_message(action: ChangedFilesAction) -> Option<AppMessage> {
             } else {
                 Some(AppMessage::StageFileRequested(path))
             }
+        }
+        ChangedFilesAction::CommitSummaryUpdated(summary) => {
+            Some(AppMessage::CommitSummaryUpdated(summary))
+        }
+        ChangedFilesAction::CommitDescriptionUpdated(description) => {
+            Some(AppMessage::CommitDescriptionUpdated(description))
+        }
+        ChangedFilesAction::AmendLastCommitToggled(amend) => {
+            Some(AppMessage::AmendLastCommitToggled(amend))
+        }
+        ChangedFilesAction::PushAfterCommitToggled(push) => {
+            Some(AppMessage::PushAfterCommitToggled(push))
+        }
+        ChangedFilesAction::CommitChangesRequested { summary, description, amend, push } => {
+            Some(AppMessage::CommitChangesRequested { summary, description, amend, push })
         }
     }
 }

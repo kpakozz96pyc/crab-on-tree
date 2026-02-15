@@ -54,6 +54,8 @@ pub enum Effect {
     CreateCommit {
         repo_path: PathBuf,
         message: String,
+        amend: bool,
+        push: bool,
     },
 
     /// Load author identity.

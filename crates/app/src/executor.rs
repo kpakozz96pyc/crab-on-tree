@@ -77,8 +77,8 @@ fn worker_thread(
                     execute_unstage_file(repo_path, file_path).await,
                 Job::StageAll(path) => execute_stage_all(path).await,
                 Job::UnstageAll(path) => execute_unstage_all(path).await,
-                Job::CreateCommit { repo_path, message } =>
-                    execute_create_commit(repo_path, message).await,
+                Job::CreateCommit { repo_path, message, amend, push } =>
+                    execute_create_commit(repo_path, message, amend, push).await,
                 Job::LoadAuthorIdentity(path) => execute_load_author_identity(path).await,
                 Job::LoadBranchTree(path) => execute_load_branch_tree(path).await,
                 Job::CheckoutBranch { repo_path, branch_name } =>
@@ -306,18 +306,48 @@ async fn execute_unstage_all(path: PathBuf) -> anyhow::Result<AppMessage> {
 }
 
 /// Execute the CreateCommit job.
-#[instrument(skip(repo_path, message))]
-async fn execute_create_commit(repo_path: PathBuf, message: String) -> anyhow::Result<AppMessage> {
+#[instrument(skip(repo_path, message, amend, push))]
+async fn execute_create_commit(
+    repo_path: PathBuf,
+    message: String,
+    amend: bool,
+    push: bool,
+) -> anyhow::Result<AppMessage> {
     let message_clone = message.clone();
+    let repo_path_clone = repo_path.clone();
+
     let commit_hash = tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
         let repo = GitRepository::open(&repo_path)
             .with_context(|| format!("Failed to open repository at {}", repo_path.display()))?;
 
-        repo.create_commit(&message_clone)
-            .context("Failed to create commit")
+        if amend {
+            repo.amend_commit(&message_clone)
+                .context("Failed to amend commit")
+        } else {
+            repo.create_commit(&message_clone)
+                .context("Failed to create commit")
+        }
     })
     .await
     .context("Task panicked")??;
+
+    // Push to remote if requested
+    if push {
+        let push_result = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+            let repo = GitRepository::open(&repo_path_clone)
+                .with_context(|| format!("Failed to open repository at {}", repo_path_clone.display()))?;
+
+            repo.push()
+                .context("Failed to push to remote")
+        })
+        .await
+        .context("Task panicked")?;
+
+        // Log push errors but don't fail the commit
+        if let Err(e) = push_result {
+            tracing::warn!("Push failed after commit: {}", e);
+        }
+    }
 
     Ok(AppMessage::CommitCreated {
         hash: commit_hash,
@@ -461,6 +491,10 @@ async fn execute_load_changed_files(path: PathBuf) -> anyhow::Result<AppMessage>
             selected_file: None,
             commit_message: String::new(), // Empty for working directory
             is_commit_view: false, // This is working directory view
+            commit_summary: String::new(),
+            commit_description: String::new(),
+            amend_last_commit: false,
+            push_after_commit: false,
         })
     })
     .await

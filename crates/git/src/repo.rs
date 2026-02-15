@@ -720,6 +720,76 @@ impl GitRepository {
         Ok(commit_hash)
     }
 
+    /// Amend the last commit with a new message.
+    pub fn amend_commit(&self, message: &str) -> Result<String, GitError> {
+        // Validate message
+        if message.trim().is_empty() {
+            return Err(GitError::OperationFailed(
+                "Commit message cannot be empty".to_string()
+            ));
+        }
+
+        // Get author identity
+        let (author_name, author_email) = self.get_author_identity()?;
+
+        // Create signature for author and committer
+        let signature = git2::Signature::now(&author_name, &author_email)?;
+
+        // Get HEAD commit
+        let head = self.git2_repo.head()?;
+        let commit_to_amend = head.peel_to_commit()?;
+
+        // Get the original author (preserve it)
+        let original_author = commit_to_amend.author();
+
+        // Get tree from index
+        let mut index = self.git2_repo.index()?;
+        let tree_oid = index.write_tree()?;
+        let tree = self.git2_repo.find_tree(tree_oid)?;
+
+        // Get parents of the commit we're amending
+        let parents: Vec<_> = commit_to_amend.parents().collect();
+        let parent_refs: Vec<_> = parents.iter().collect();
+
+        // Create the amended commit
+        let commit_oid = self.git2_repo.commit(
+            Some("HEAD"),           // Update HEAD
+            &original_author,       // Preserve original author
+            &signature,             // New committer
+            message,                // New commit message
+            &tree,                  // Tree (may be updated if there are new staged changes)
+            &parent_refs,           // Same parents as original commit
+        )?;
+
+        let commit_hash = commit_oid.to_string();
+        tracing::info!("Amended commit: {}", commit_hash);
+        Ok(commit_hash)
+    }
+
+    /// Push current branch to remote.
+    pub fn push(&self) -> Result<(), GitError> {
+        // Get current branch name
+        let head = self.git2_repo.head()?;
+        if head.is_branch() {
+            let branch_name = head.shorthand()
+                .ok_or_else(|| GitError::OperationFailed("Could not get branch name".to_string()))?;
+
+            // Get the remote (default to "origin")
+            let mut remote = self.git2_repo.find_remote("origin")
+                .map_err(|e| GitError::OperationFailed(format!("Failed to find remote 'origin': {}", e)))?;
+
+            // Push to remote
+            let refspec = format!("refs/heads/{}:refs/heads/{}", branch_name, branch_name);
+            remote.push(&[&refspec], None)
+                .map_err(|e| GitError::OperationFailed(format!("Failed to push: {}", e)))?;
+
+            tracing::info!("Pushed {} to origin", branch_name);
+            Ok(())
+        } else {
+            Err(GitError::OperationFailed("HEAD is not a branch".to_string()))
+        }
+    }
+
     /// List all local branches with metadata.
     #[instrument(skip(self))]
     pub fn list_local_branches(&self) -> Result<Vec<(String, String, bool, Option<String>)>, GitError> {

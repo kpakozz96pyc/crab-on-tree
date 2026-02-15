@@ -91,6 +91,11 @@ pub struct ChangedFilesState {
     pub selected_file: Option<PathBuf>,
     pub commit_message: String,
     pub is_commit_view: bool, // true if viewing a commit, false if viewing working directory
+    // Commit panel fields
+    pub commit_summary: String,
+    pub commit_description: String,
+    pub amend_last_commit: bool,
+    pub push_after_commit: bool,
 }
 
 /// Diff view mode.

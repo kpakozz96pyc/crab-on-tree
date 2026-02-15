@@ -65,6 +65,8 @@ pub enum Job {
     CreateCommit {
         repo_path: PathBuf,
         message: String,
+        amend: bool,
+        push: bool,
     },
 
     /// Load author identity from git config.

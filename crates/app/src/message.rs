@@ -194,4 +194,24 @@ pub enum AppMessage {
     /// User changed diff view mode.
     DiffViewModeChanged(DiffViewMode),
 
+    /// User updated the commit summary.
+    CommitSummaryUpdated(String),
+
+    /// User updated the commit description.
+    CommitDescriptionUpdated(String),
+
+    /// User toggled amend last commit option.
+    AmendLastCommitToggled(bool),
+
+    /// User toggled push after commit option.
+    PushAfterCommitToggled(bool),
+
+    /// User requested to commit changes.
+    CommitChangesRequested {
+        summary: String,
+        description: String,
+        amend: bool,
+        push: bool,
+    },
+
 }

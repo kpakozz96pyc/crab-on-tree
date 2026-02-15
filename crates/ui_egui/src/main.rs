@@ -198,9 +198,9 @@ impl CrabOnTreeApp {
             Effect::UnstageAll(path) => {
                 self.executor.submit(crabontree_app::Job::UnstageAll(path));
             }
-            Effect::CreateCommit { repo_path, message } => {
+            Effect::CreateCommit { repo_path, message, amend, push } => {
                 self.executor
-                    .submit(crabontree_app::Job::CreateCommit { repo_path, message });
+                    .submit(crabontree_app::Job::CreateCommit { repo_path, message, amend, push });
             }
             Effect::LoadAuthorIdentity(path) => {
                 self.executor

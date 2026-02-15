@@ -146,6 +146,10 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
                         selected_file: None,
                         commit_message,
                         is_commit_view: true, // This is a commit view, not working directory
+                        commit_summary: String::new(),
+                        commit_description: String::new(),
+                        amend_last_commit: false,
+                        push_after_commit: false,
                     };
 
                     // Convert FileDiff entries to WorkingDirFile entries
@@ -277,6 +281,8 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
                     Effect::CreateCommit {
                         repo_path: repo.path.clone(),
                         message: repo.commit_message.clone(),
+                        amend: false,
+                        push: false,
                     }
                 }
             } else {
@@ -289,6 +295,13 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
             if let Some(repo) = &mut state.current_repo {
                 // Clear commit message
                 repo.commit_message.clear();
+
+                // Clear commit panel fields
+                if let Some(changed_files) = &mut repo.changed_files {
+                    changed_files.commit_summary.clear();
+                    changed_files.commit_description.clear();
+                    changed_files.amend_last_commit = false;
+                }
 
                 // Show success message temporarily
                 tracing::info!("Commit created: {}", hash);
@@ -628,6 +641,61 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
                 }
             }
             Effect::None
+        }
+
+        AppMessage::CommitSummaryUpdated(summary) => {
+            if let Some(repo) = &mut state.current_repo {
+                if let Some(changed_files) = &mut repo.changed_files {
+                    changed_files.commit_summary = summary;
+                }
+            }
+            Effect::None
+        }
+
+        AppMessage::CommitDescriptionUpdated(description) => {
+            if let Some(repo) = &mut state.current_repo {
+                if let Some(changed_files) = &mut repo.changed_files {
+                    changed_files.commit_description = description;
+                }
+            }
+            Effect::None
+        }
+
+        AppMessage::AmendLastCommitToggled(amend) => {
+            if let Some(repo) = &mut state.current_repo {
+                if let Some(changed_files) = &mut repo.changed_files {
+                    changed_files.amend_last_commit = amend;
+                }
+            }
+            Effect::None
+        }
+
+        AppMessage::PushAfterCommitToggled(push) => {
+            if let Some(repo) = &mut state.current_repo {
+                if let Some(changed_files) = &mut repo.changed_files {
+                    changed_files.push_after_commit = push;
+                }
+            }
+            Effect::None
+        }
+
+        AppMessage::CommitChangesRequested { summary, description, amend, push } => {
+            if let Some(repo) = &state.current_repo {
+                let full_message = if description.is_empty() {
+                    summary.clone()
+                } else {
+                    format!("{}\n\n{}", summary, description)
+                };
+
+                Effect::CreateCommit {
+                    repo_path: repo.path.clone(),
+                    message: full_message,
+                    amend,
+                    push,
+                }
+            } else {
+                Effect::None
+            }
         }
 
     }
