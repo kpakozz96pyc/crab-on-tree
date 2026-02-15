@@ -385,6 +385,7 @@ impl CrabOnTreeApp {
         let mut viewer = PaneViewer {
             repo_data,
             messages: &mut messages,
+            loading: self.state.loading,
         };
 
         DockArea::new(&mut self.dock_state)
@@ -401,6 +402,7 @@ impl CrabOnTreeApp {
 struct PaneViewer<'a> {
     repo_data: &'a crabontree_app::RepoState,
     messages: &'a mut Vec<crabontree_app::AppMessage>,
+    loading: bool,
 }
 
 impl<'a> egui_dock::TabViewer for PaneViewer<'a> {
@@ -441,7 +443,7 @@ impl<'a> egui_dock::TabViewer for PaneViewer<'a> {
                 }
                 panes::Pane::ChangedFiles => {
                     if let Some(files) = &repo.changed_files {
-                        let action = panes::changed_files::render(ui, files);
+                        let action = panes::changed_files::render(ui, files, self.loading);
                         if let Some(msg) = panes::changed_files::action_to_message(action) {
                             self.messages.push(msg);
                         }

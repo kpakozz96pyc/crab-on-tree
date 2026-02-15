@@ -76,7 +76,7 @@ fn render_section(
         });
 }
 
-pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesAction {
+pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> ChangedFilesAction {
     let mut action = ChangedFilesAction::None;
 
     // Handle Enter key for staging/unstaging selected files
@@ -210,7 +210,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesActio
 
         ui.add_space(5.0);
 
-        // Checkboxes (left column) and Commit button (right side)
+        // Checkboxes (left column) and Commit button with spinner (right side)
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 let mut amend = files.amend_last_commit;
@@ -225,7 +225,13 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesActio
             });
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let commit_enabled = has_staged_files && !files.commit_summary.is_empty();
+                // Show spinner while loading
+                if loading {
+                    ui.spinner();
+                    ui.label("Committing...");
+                }
+
+                let commit_enabled = has_staged_files && !files.commit_summary.is_empty() && !loading;
                 if ui.add_enabled(commit_enabled, egui::Button::new("Commit")).clicked() {
                     action = ChangedFilesAction::CommitChangesRequested {
                         summary: files.commit_summary.clone(),
