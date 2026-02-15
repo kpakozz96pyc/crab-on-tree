@@ -419,11 +419,9 @@ impl<'a> egui_dock::TabViewer for PaneViewer<'a> {
         // Render pane content with appropriate scroll configuration
         let scroll_config = match tab {
             panes::Pane::DiffViewer => panes::scrollable_pane::ScrollablePaneConfig::new_both_scroll(
-                tab.title(),
                 &scroll_id,
             ),
             _ => panes::scrollable_pane::ScrollablePaneConfig::new(
-                tab.title(),
                 &scroll_id,
             ),
         };
