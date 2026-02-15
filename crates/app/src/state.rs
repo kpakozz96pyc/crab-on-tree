@@ -89,6 +89,8 @@ pub struct ChangedFilesState {
     pub untracked: Vec<WorkingDirFile>,
     pub conflicted: Vec<WorkingDirFile>,
     pub selected_file: Option<PathBuf>,
+    pub selected_files: HashSet<PathBuf>,
+    pub last_clicked_file: Option<PathBuf>, // For range selection
     pub commit_message: String,
     pub is_commit_view: bool, // true if viewing a commit, false if viewing working directory
     // Commit panel fields

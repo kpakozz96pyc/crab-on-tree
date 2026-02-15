@@ -166,6 +166,19 @@ pub enum AppMessage {
     /// User selected a changed file.
     ChangedFileSelected(PathBuf),
 
+    /// User selected a file with modifiers (Ctrl/Shift).
+    SelectFileWithModifiers {
+        path: PathBuf,
+        ctrl: bool,
+        shift: bool,
+    },
+
+    /// User requested to stage all selected files.
+    StageSelectedFilesRequested,
+
+    /// User requested to unstage all selected files.
+    UnstageSelectedFilesRequested,
+
     /// User requested to view file content.
     FileContentRequested(PathBuf),
 

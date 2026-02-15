@@ -489,6 +489,8 @@ async fn execute_load_changed_files(path: PathBuf) -> anyhow::Result<AppMessage>
             untracked,
             conflicted,
             selected_file: None,
+            selected_files: std::collections::HashSet::new(),
+            last_clicked_file: None,
             commit_message: String::new(), // Empty for working directory
             is_commit_view: false, // This is working directory view
             commit_summary: String::new(),

@@ -12,7 +12,10 @@ use std::path::Path;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileRowInteraction {
     None,
-    SingleClick,
+    SingleClick {
+        ctrl: bool,
+        shift: bool,
+    },
     DoubleClick,
 }
 
@@ -53,7 +56,9 @@ impl<'a> FileRow<'a> {
         if response.double_clicked() {
             FileRowInteraction::DoubleClick
         } else if response.clicked() {
-            FileRowInteraction::SingleClick
+            let ctrl = ui.input(|i| i.modifiers.ctrl || i.modifiers.command);
+            let shift = ui.input(|i| i.modifiers.shift);
+            FileRowInteraction::SingleClick { ctrl, shift }
         } else {
             FileRowInteraction::None
         }

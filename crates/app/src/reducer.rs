@@ -144,6 +144,8 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
                         untracked: Vec::new(),
                         conflicted: Vec::new(),
                         selected_file: None,
+                        selected_files: std::collections::HashSet::new(),
+                        last_clicked_file: None,
                         commit_message,
                         is_commit_view: true, // This is a commit view, not working directory
                         commit_summary: String::new(),
@@ -519,6 +521,10 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
             if let Some(repo) = &mut state.current_repo {
                 if let Some(files) = &mut repo.changed_files {
                     files.selected_file = Some(path.clone());
+                    // Clear multi-selection and select only this file
+                    files.selected_files.clear();
+                    files.selected_files.insert(path.clone());
+                    files.last_clicked_file = Some(path.clone());
                 }
 
                 // Check if we're viewing a commit or working directory
@@ -573,6 +579,98 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
             } else {
                 Effect::None
             }
+        }
+
+        AppMessage::SelectFileWithModifiers { path, ctrl, shift } => {
+            if let Some(repo) = &mut state.current_repo {
+                if let Some(files) = &mut repo.changed_files {
+                    if ctrl {
+                        // Ctrl+Click: Toggle file in selection
+                        if files.selected_files.contains(&path) {
+                            files.selected_files.remove(&path);
+                        } else {
+                            files.selected_files.insert(path.clone());
+                        }
+                        files.last_clicked_file = Some(path.clone());
+                        files.selected_file = Some(path);
+                    } else if shift {
+                        // Shift+Click: Range selection
+                        if let Some(last_clicked) = &files.last_clicked_file {
+                            // Get all files in order
+                            let mut all_files = Vec::new();
+                            all_files.extend(files.staged.iter().map(|f| &f.path));
+                            all_files.extend(files.unstaged.iter().map(|f| &f.path));
+                            all_files.extend(files.untracked.iter().map(|f| &f.path));
+                            all_files.extend(files.conflicted.iter().map(|f| &f.path));
+
+                            // Find indices of last clicked and current
+                            let last_idx = all_files.iter().position(|p| *p == last_clicked);
+                            let current_idx = all_files.iter().position(|p| *p == &path);
+
+                            if let (Some(start), Some(end)) = (last_idx, current_idx) {
+                                let (start, end) = if start < end { (start, end) } else { (end, start) };
+                                // Select all files in range
+                                for i in start..=end {
+                                    files.selected_files.insert(all_files[i].clone());
+                                }
+                            }
+                        }
+                        files.selected_file = Some(path);
+                    }
+                }
+            }
+            Effect::None
+        }
+
+        AppMessage::StageSelectedFilesRequested => {
+            if let Some(repo) = &state.current_repo {
+                if let Some(files) = &repo.changed_files {
+                    // Collect files to stage (from unstaged and untracked)
+                    let files_to_stage: Vec<_> = files.selected_files.iter()
+                        .filter(|path| {
+                            files.unstaged.iter().any(|f| &f.path == *path)
+                                || files.untracked.iter().any(|f| &f.path == *path)
+                        })
+                        .cloned()
+                        .collect();
+
+                    if !files_to_stage.is_empty() {
+                        state.loading = true;
+                        let effects: Vec<_> = files_to_stage.into_iter()
+                            .map(|path| Effect::StageFile {
+                                repo_path: repo.path.clone(),
+                                file_path: path,
+                            })
+                            .collect();
+                        return Effect::Batch(effects);
+                    }
+                }
+            }
+            Effect::None
+        }
+
+        AppMessage::UnstageSelectedFilesRequested => {
+            if let Some(repo) = &state.current_repo {
+                if let Some(files) = &repo.changed_files {
+                    // Collect files to unstage (from staged)
+                    let files_to_unstage: Vec<_> = files.selected_files.iter()
+                        .filter(|path| files.staged.iter().any(|f| &f.path == *path))
+                        .cloned()
+                        .collect();
+
+                    if !files_to_unstage.is_empty() {
+                        state.loading = true;
+                        let effects: Vec<_> = files_to_unstage.into_iter()
+                            .map(|path| Effect::UnstageFile {
+                                repo_path: repo.path.clone(),
+                                file_path: path,
+                            })
+                            .collect();
+                        return Effect::Batch(effects);
+                    }
+                }
+            }
+            Effect::None
         }
 
         AppMessage::FileContentRequested(path) => {

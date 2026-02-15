@@ -6,7 +6,14 @@ use std::path::PathBuf;
 pub enum ChangedFilesAction {
     None,
     SelectFile(PathBuf),
+    SelectFileWithModifiers {
+        path: PathBuf,
+        ctrl: bool,
+        shift: bool,
+    },
     ToggleStage { path: PathBuf, is_staged: bool },
+    StageSelectedFiles,
+    UnstageSelectedFiles,
     CommitSummaryUpdated(String),
     CommitDescriptionUpdated(String),
     AmendLastCommitToggled(bool),
@@ -24,7 +31,7 @@ fn render_section(
     id: &str,
     title: &str,
     files: &[crabontree_app::WorkingDirFile],
-    selected_file: Option<&PathBuf>,
+    selected_files: &std::collections::HashSet<PathBuf>,
     is_commit_view: bool,
     action: &mut ChangedFilesAction,
 ) {
@@ -38,12 +45,20 @@ fn render_section(
         .show(ui, |ui| {
             for (idx, file) in files.iter().enumerate() {
                 ui.push_id(format!("{}_{}", id, idx), |ui| {
-                    let is_selected = selected_file == Some(&file.path);
+                    let is_selected = selected_files.contains(&file.path);
                     let interaction = FileRow::new(&file.path, &file.status, is_selected).render(ui);
 
                     match interaction {
-                        FileRowInteraction::SingleClick => {
-                            *action = ChangedFilesAction::SelectFile(file.path.clone());
+                        FileRowInteraction::SingleClick { ctrl, shift } => {
+                            if ctrl || shift {
+                                *action = ChangedFilesAction::SelectFileWithModifiers {
+                                    path: file.path.clone(),
+                                    ctrl,
+                                    shift,
+                                };
+                            } else {
+                                *action = ChangedFilesAction::SelectFile(file.path.clone());
+                            }
                         }
                         FileRowInteraction::DoubleClick => {
                             // Only allow staging/unstaging in working directory view
@@ -63,7 +78,21 @@ fn render_section(
 
 pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesAction {
     let mut action = ChangedFilesAction::None;
-    let selected_file = files.selected_file.as_ref();
+
+    // Handle Enter key for staging/unstaging selected files
+    if !files.is_commit_view && ui.input(|i| i.key_pressed(egui::Key::Enter)) && !files.selected_files.is_empty() {
+        // Determine if we should stage or unstage based on where the files are
+        let has_unstaged = files.selected_files.iter().any(|path| {
+            files.unstaged.iter().any(|f| &f.path == path)
+                || files.untracked.iter().any(|f| &f.path == path)
+        });
+
+        if has_unstaged {
+            action = ChangedFilesAction::StageSelectedFiles;
+        } else {
+            action = ChangedFilesAction::UnstageSelectedFiles;
+        }
+    }
 
     // Render commit message section if available (for commit view)
     if files.is_commit_view && !files.commit_message.is_empty() {
@@ -91,7 +120,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesActio
             "changed_files_staged",
             "Staged",
             &files.staged,
-            selected_file,
+            &files.selected_files,
             files.is_commit_view,
             &mut action,
         );
@@ -104,7 +133,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesActio
             "changed_files_unstaged",
             "Unstaged",
             &files.unstaged,
-            selected_file,
+            &files.selected_files,
             files.is_commit_view,
             &mut action,
         );
@@ -117,7 +146,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesActio
             "changed_files_untracked",
             "Untracked",
             &files.untracked,
-            selected_file,
+            &files.selected_files,
             files.is_commit_view,
             &mut action,
         );
@@ -130,7 +159,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesActio
             "changed_files_conflicted",
             "Conflicted",
             &files.conflicted,
-            selected_file,
+            &files.selected_files,
             files.is_commit_view,
             &mut action,
         );
@@ -216,6 +245,9 @@ pub fn action_to_message(action: ChangedFilesAction) -> Option<AppMessage> {
     match action {
         ChangedFilesAction::None => None,
         ChangedFilesAction::SelectFile(path) => Some(AppMessage::ChangedFileSelected(path)),
+        ChangedFilesAction::SelectFileWithModifiers { path, ctrl, shift } => {
+            Some(AppMessage::SelectFileWithModifiers { path, ctrl, shift })
+        }
         ChangedFilesAction::ToggleStage { path, is_staged } => {
             if is_staged {
                 Some(AppMessage::UnstageFileRequested(path))
@@ -223,6 +255,8 @@ pub fn action_to_message(action: ChangedFilesAction) -> Option<AppMessage> {
                 Some(AppMessage::StageFileRequested(path))
             }
         }
+        ChangedFilesAction::StageSelectedFiles => Some(AppMessage::StageSelectedFilesRequested),
+        ChangedFilesAction::UnstageSelectedFiles => Some(AppMessage::UnstageSelectedFilesRequested),
         ChangedFilesAction::CommitSummaryUpdated(summary) => {
             Some(AppMessage::CommitSummaryUpdated(summary))
         }
