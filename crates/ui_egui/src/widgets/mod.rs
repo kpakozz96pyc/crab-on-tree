@@ -7,5 +7,5 @@ pub mod selectable_row;
 
 pub use diff_view::DiffView;
 pub use file_content::FileContentView;
-pub use file_row::FileRow;
+pub use file_row::{FileRow, FileRowInteraction};
 pub use selectable_row::selectable_row;

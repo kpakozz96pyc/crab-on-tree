@@ -1,4 +1,4 @@
-use crate::widgets::FileRow;
+use crate::widgets::{FileRow, FileRowInteraction};
 use crabontree_app::{AppMessage, ChangedFilesState};
 use eframe::egui;
 use std::path::PathBuf;
@@ -6,6 +6,7 @@ use std::path::PathBuf;
 pub enum ChangedFilesAction {
     None,
     SelectFile(PathBuf),
+    ToggleStage { path: PathBuf, is_staged: bool },
 }
 
 fn render_section(
@@ -14,6 +15,7 @@ fn render_section(
     title: &str,
     files: &[crabontree_app::WorkingDirFile],
     selected_file: Option<&PathBuf>,
+    is_commit_view: bool,
     action: &mut ChangedFilesAction,
 ) {
     if files.is_empty() {
@@ -27,8 +29,22 @@ fn render_section(
             for (idx, file) in files.iter().enumerate() {
                 ui.push_id(format!("{}_{}", id, idx), |ui| {
                     let is_selected = selected_file == Some(&file.path);
-                    if FileRow::new(&file.path, &file.status, is_selected).render(ui) {
-                        *action = ChangedFilesAction::SelectFile(file.path.clone());
+                    let interaction = FileRow::new(&file.path, &file.status, is_selected).render(ui);
+
+                    match interaction {
+                        FileRowInteraction::SingleClick => {
+                            *action = ChangedFilesAction::SelectFile(file.path.clone());
+                        }
+                        FileRowInteraction::DoubleClick => {
+                            // Only allow staging/unstaging in working directory view
+                            if !is_commit_view {
+                                *action = ChangedFilesAction::ToggleStage {
+                                    path: file.path.clone(),
+                                    is_staged: file.is_staged,
+                                };
+                            }
+                        }
+                        FileRowInteraction::None => {}
                     }
                 });
             }
@@ -66,6 +82,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesActio
             "Staged",
             &files.staged,
             selected_file,
+            files.is_commit_view,
             &mut action,
         );
         ui.add_space(5.0);
@@ -78,6 +95,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesActio
             "Unstaged",
             &files.unstaged,
             selected_file,
+            files.is_commit_view,
             &mut action,
         );
         ui.add_space(5.0);
@@ -90,6 +108,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesActio
             "Untracked",
             &files.untracked,
             selected_file,
+            files.is_commit_view,
             &mut action,
         );
         ui.add_space(5.0);
@@ -102,6 +121,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesActio
             "Conflicted",
             &files.conflicted,
             selected_file,
+            files.is_commit_view,
             &mut action,
         );
     }
@@ -113,5 +133,12 @@ pub fn action_to_message(action: ChangedFilesAction) -> Option<AppMessage> {
     match action {
         ChangedFilesAction::None => None,
         ChangedFilesAction::SelectFile(path) => Some(AppMessage::ChangedFileSelected(path)),
+        ChangedFilesAction::ToggleStage { path, is_staged } => {
+            if is_staged {
+                Some(AppMessage::UnstageFileRequested(path))
+            } else {
+                Some(AppMessage::StageFileRequested(path))
+            }
+        }
     }
 }

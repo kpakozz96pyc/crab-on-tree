@@ -8,6 +8,14 @@ use crabontree_app::WorkingDirStatus;
 use eframe::egui;
 use std::path::Path;
 
+/// Interaction type for file row clicks
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileRowInteraction {
+    None,
+    SingleClick,
+    DoubleClick,
+}
+
 /// A file row widget that displays a file with its status icon.
 pub struct FileRow<'a> {
     /// The file path to display
@@ -28,11 +36,11 @@ impl<'a> FileRow<'a> {
         }
     }
 
-    /// Renders the file row and returns true if it was clicked.
-    pub fn render(self, ui: &mut egui::Ui) -> bool {
+    /// Renders the file row and returns the interaction type.
+    pub fn render(self, ui: &mut egui::Ui) -> FileRowInteraction {
         let (status_icon, status_color) = self.get_status_info();
 
-        ui.horizontal(|ui| {
+        let response = ui.horizontal(|ui| {
             ui.set_min_width(ui.available_width());
             ui.colored_label(
                 status_color,
@@ -40,8 +48,15 @@ impl<'a> FileRow<'a> {
             );
             ui.selectable_label(self.is_selected, self.path.display().to_string())
         })
-        .inner
-        .clicked()
+        .inner;
+
+        if response.double_clicked() {
+            FileRowInteraction::DoubleClick
+        } else if response.clicked() {
+            FileRowInteraction::SingleClick
+        } else {
+            FileRowInteraction::None
+        }
     }
 
     /// Gets the status icon and color for the current file status.

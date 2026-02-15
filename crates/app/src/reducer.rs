@@ -145,6 +145,7 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
                         conflicted: Vec::new(),
                         selected_file: None,
                         commit_message,
+                        is_commit_view: true, // This is a commit view, not working directory
                     };
 
                     // Convert FileDiff entries to WorkingDirFile entries
@@ -238,9 +239,10 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
             state.loading = false;
             state.staging_progress = None;
             if let Some(repo) = &state.current_repo {
-                // Refresh working directory status and repository status after staging
+                // Refresh working directory status, changed files, and repository status after staging
                 Effect::Batch(vec![
                     Effect::LoadWorkingDirStatus(repo.path.clone()),
+                    Effect::LoadChangedFiles(repo.path.clone()),
                     Effect::RefreshRepo(repo.path.clone()),
                 ])
             } else {

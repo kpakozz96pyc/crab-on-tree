@@ -460,6 +460,7 @@ async fn execute_load_changed_files(path: PathBuf) -> anyhow::Result<AppMessage>
             conflicted,
             selected_file: None,
             commit_message: String::new(), // Empty for working directory
+            is_commit_view: false, // This is working directory view
         })
     })
     .await

@@ -90,6 +90,7 @@ pub struct ChangedFilesState {
     pub conflicted: Vec<WorkingDirFile>,
     pub selected_file: Option<PathBuf>,
     pub commit_message: String,
+    pub is_commit_view: bool, // true if viewing a commit, false if viewing working directory
 }
 
 /// Diff view mode.
