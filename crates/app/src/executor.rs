@@ -318,9 +318,6 @@ async fn execute_create_commit(
     let message_clone = message.clone();
     let repo_path_clone = repo_path.clone();
 
-    // Add a 2-second delay to see the loader
-    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
     let commit_hash = tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
         let repo = GitRepository::open(&repo_path)
             .with_context(|| format!("Failed to open repository at {}", repo_path.display()))?;

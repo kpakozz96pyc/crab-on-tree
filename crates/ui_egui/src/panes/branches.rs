@@ -125,8 +125,11 @@ fn render_remote_section(
         });
 }
 
-pub fn render(ui: &mut egui::Ui, branch_tree: &BranchTreeState) -> BranchesAction {
+pub fn render(ui: &mut egui::Ui, branch_tree: &BranchTreeState, loading: bool) -> BranchesAction {
     let mut action = BranchesAction::None;
+
+    // Store pane rect for overlay
+    let pane_rect = ui.available_rect_before_wrap();
 
     // Handle Enter key on selected branch
     if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
@@ -177,6 +180,37 @@ pub fn render(ui: &mut egui::Ui, branch_tree: &BranchTreeState) -> BranchesActio
             branch_tree.selected_branch.as_ref(),
             &mut action,
         );
+    }
+
+    // Draw loading overlay if loading
+    if loading {
+        let painter = ui.painter();
+
+        // Draw semi-transparent overlay
+        painter.rect_filled(
+            pane_rect,
+            0.0,
+            egui::Color32::from_black_alpha(128),
+        );
+
+        // Draw spinner and text in the center
+        let center = pane_rect.center();
+        let spinner_rect = egui::Rect::from_center_size(
+            center,
+            egui::vec2(150.0, 50.0),
+        );
+
+        ui.allocate_ui_at_rect(spinner_rect, |ui| {
+            ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+                ui.add_space(5.0);
+                ui.spinner();
+                ui.label(
+                    egui::RichText::new("Switching branch...")
+                        .color(egui::Color32::WHITE)
+                        .strong()
+                );
+            });
+        });
     }
 
     action

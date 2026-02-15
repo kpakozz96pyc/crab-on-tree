@@ -373,6 +373,7 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
 
         AppMessage::BranchCheckoutRequested { name, is_remote } => {
             if let Some(repo) = &state.current_repo {
+                state.loading = true;
                 // Check for uncommitted changes first
                 Effect::CheckUncommittedChanges {
                     repo_path: repo.path.clone(),
@@ -385,6 +386,7 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
         }
 
         AppMessage::ShowCheckoutWithChangesDialog { branch_name, is_remote } => {
+            state.loading = false; // Stop loading to show dialog
             state.checkout_changes_dialog = Some(crate::state::CheckoutChangesDialog {
                 branch_name,
                 is_remote,
@@ -395,6 +397,7 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
         AppMessage::CheckoutWithStash { branch_name, is_remote } => {
             state.checkout_changes_dialog = None; // Close dialog
             if let Some(repo) = &state.current_repo {
+                state.loading = true;
                 Effect::StashAndCheckout {
                     repo_path: repo.path.clone(),
                     branch_name,
@@ -409,6 +412,7 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
         AppMessage::CheckoutWithDiscard { branch_name, is_remote } => {
             state.checkout_changes_dialog = None; // Close dialog
             if let Some(repo) = &state.current_repo {
+                state.loading = true;
                 Effect::DiscardAndCheckout {
                     repo_path: repo.path.clone(),
                     branch_name,
@@ -431,6 +435,7 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
         AppMessage::CheckoutRemoteOverride { remote_branch, local_name } => {
             state.branch_conflict_dialog = None; // Close dialog
             if let Some(repo) = &state.current_repo {
+                state.loading = true;
                 Effect::CheckoutRemoteBranch {
                     repo_path: repo.path.clone(),
                     remote_branch,
@@ -445,6 +450,7 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
         AppMessage::CheckoutRemoteRename { remote_branch, new_local_name } => {
             state.branch_conflict_dialog = None; // Close dialog
             if let Some(repo) = &state.current_repo {
+                state.loading = true;
                 Effect::CheckoutRemoteBranch {
                     repo_path: repo.path.clone(),
                     remote_branch,

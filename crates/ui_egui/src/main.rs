@@ -465,7 +465,7 @@ impl<'a> egui_dock::TabViewer for PaneViewer<'a> {
                 }
                 panes::Pane::Branches => {
                     if let Some(branch_tree) = &repo.branch_tree {
-                        let action = panes::branches::render(ui, branch_tree);
+                        let action = panes::branches::render(ui, branch_tree, self.loading);
                         if let Some(msg) = panes::branches::action_to_message(action) {
                             self.messages.push(msg);
                         }
