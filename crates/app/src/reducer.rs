@@ -308,10 +308,11 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
                 // Show success message temporarily
                 tracing::info!("Commit created: {}", hash);
 
-                // Refresh repo data and working directory
+                // Refresh repo data, working directory, and changed files
                 Effect::Batch(vec![
                     Effect::LoadCommitHistory(repo.path.clone()),
                     Effect::LoadWorkingDirStatus(repo.path.clone()),
+                    Effect::LoadChangedFiles(repo.path.clone()),
                     Effect::RefreshRepo(repo.path.clone()),
                 ])
             } else {
@@ -508,9 +509,16 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
             }
         }
 
-        AppMessage::ChangedFilesLoaded(changed_files) => {
+        AppMessage::ChangedFilesLoaded(mut changed_files) => {
             state.loading = false;
             if let Some(repo) = &mut state.current_repo {
+                // Preserve commit panel fields from previous state
+                if let Some(old_files) = &repo.changed_files {
+                    changed_files.commit_summary = old_files.commit_summary.clone();
+                    changed_files.commit_description = old_files.commit_description.clone();
+                    changed_files.amend_last_commit = old_files.amend_last_commit;
+                    changed_files.push_after_commit = old_files.push_after_commit;
+                }
                 repo.changed_files = Some(changed_files);
                 tracing::info!("Loaded changed files");
             }
