@@ -172,6 +172,9 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
 
         ui.separator();
 
+        // Store commit area rect for overlay
+        let commit_area_rect = ui.available_rect_before_wrap();
+
         let has_staged_files = !files.staged.is_empty();
 
         // Commit summary
@@ -210,7 +213,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
 
         ui.add_space(5.0);
 
-        // Checkboxes (left column) and Commit button with spinner (right side)
+        // Checkboxes (left column) and Commit button (right side)
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 let mut amend = files.amend_last_commit;
@@ -225,12 +228,6 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
             });
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                // Show spinner while loading
-                if loading {
-                    ui.spinner();
-                    ui.label("Committing...");
-                }
-
                 let commit_enabled = has_staged_files && !files.commit_summary.is_empty() && !loading;
                 if ui.add_enabled(commit_enabled, egui::Button::new("Commit")).clicked() {
                     action = ChangedFilesAction::CommitChangesRequested {
@@ -242,6 +239,37 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                 }
             });
         });
+
+        // Draw loading overlay if loading
+        if loading {
+            let painter = ui.painter();
+
+            // Draw semi-transparent overlay
+            painter.rect_filled(
+                commit_area_rect,
+                0.0,
+                egui::Color32::from_black_alpha(128),
+            );
+
+            // Draw spinner and text in the center
+            let center = commit_area_rect.center();
+            let spinner_rect = egui::Rect::from_center_size(
+                center,
+                egui::vec2(100.0, 50.0),
+            );
+
+            ui.allocate_ui_at_rect(spinner_rect, |ui| {
+                ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+                    ui.add_space(5.0);
+                    ui.spinner();
+                    ui.label(
+                        egui::RichText::new("Committing...")
+                            .color(egui::Color32::WHITE)
+                            .strong()
+                    );
+                });
+            });
+        }
     }
 
     action

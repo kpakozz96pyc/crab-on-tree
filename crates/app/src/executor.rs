@@ -98,6 +98,8 @@ fn worker_thread(
                     execute_load_file_content(repo_path, file_path).await,
                 Job::LoadFileDiff { repo_path, file_path } =>
                     execute_load_file_diff(repo_path, file_path).await,
+                Job::LoadMultipleFileDiffs { repo_path, file_paths } =>
+                    execute_load_multiple_file_diffs(repo_path, file_paths).await,
             };
 
             match result {
@@ -575,6 +577,36 @@ async fn execute_load_file_diff(repo_path: PathBuf, file_path: PathBuf) -> anyho
     Ok(AppMessage::FileDiffLoaded {
         path: file_path,
         hunks,
+    })
+}
+
+/// Execute the LoadMultipleFileDiffs job.
+#[instrument(skip(repo_path, file_paths))]
+async fn execute_load_multiple_file_diffs(
+    repo_path: PathBuf,
+    file_paths: Vec<PathBuf>,
+) -> anyhow::Result<AppMessage> {
+    let paths_clone = file_paths.clone();
+    let files_with_diffs = tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+        let repo = GitRepository::open(&repo_path)
+            .with_context(|| format!("Failed to open repository at {}", repo_path.display()))?;
+
+        let mut results = Vec::new();
+        for path in paths_clone {
+            match repo.get_file_diff(&path) {
+                Ok(hunks) => results.push((path, hunks)),
+                Err(e) => {
+                    tracing::warn!("Failed to get diff for {}: {}", path.display(), e);
+                }
+            }
+        }
+        Ok(results)
+    })
+    .await
+    .context("Task panicked")??;
+
+    Ok(AppMessage::MultipleFileDiffsLoaded {
+        files: files_with_diffs,
     })
 }
 

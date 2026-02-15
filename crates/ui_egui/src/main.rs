@@ -241,6 +241,15 @@ impl CrabOnTreeApp {
                     file_path,
                 });
             }
+            Effect::LoadMultipleFileDiffs {
+                repo_path,
+                file_paths,
+            } => {
+                self.executor.submit(crabontree_app::Job::LoadMultipleFileDiffs {
+                    repo_path,
+                    file_paths,
+                });
+            }
             Effect::CheckUncommittedChanges {
                 repo_path,
                 branch_name,

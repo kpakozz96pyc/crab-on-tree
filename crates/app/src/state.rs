@@ -122,6 +122,10 @@ pub enum FileViewState {
         hunks: Vec<DiffHunk>,
         view_mode: DiffViewMode,
     },
+    MultipleDiffs {
+        files: Vec<(PathBuf, Vec<DiffHunk>)>,
+        view_mode: DiffViewMode,
+    },
     Binary {
         path: PathBuf,
         size: u64,

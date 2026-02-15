@@ -16,6 +16,16 @@ pub fn render(ui: &mut egui::Ui, state: &FileViewState) {
         FileViewState::Diff { path, hunks, .. } => {
             DiffView::new(path, hunks).render(ui);
         }
+        FileViewState::MultipleDiffs { files, .. } => {
+            for (path, hunks) in files {
+                ui.heading(path.display().to_string());
+                ui.add_space(5.0);
+                DiffView::new(path, hunks).render(ui);
+                ui.add_space(20.0);
+                ui.separator();
+                ui.add_space(20.0);
+            }
+        }
         FileViewState::Binary { path, size } => {
             ui.vertical_centered(|ui| {
                 ui.add_space(100.0);

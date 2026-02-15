@@ -198,6 +198,11 @@ pub enum AppMessage {
         hunks: Vec<DiffHunk>,
     },
 
+    /// Multiple file diffs were loaded.
+    MultipleFileDiffsLoaded {
+        files: Vec<(PathBuf, Vec<DiffHunk>)>,
+    },
+
     /// Binary file was detected.
     BinaryFileDetected {
         path: PathBuf,

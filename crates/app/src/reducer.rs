@@ -625,6 +625,16 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
                         }
                         files.selected_file = Some(path);
                     }
+
+                    // Load diffs for all selected files
+                    if files.selected_files.len() > 1 {
+                        state.loading = true;
+                        let selected_paths: Vec<_> = files.selected_files.iter().cloned().collect();
+                        return Effect::LoadMultipleFileDiffs {
+                            repo_path: repo.path.clone(),
+                            file_paths: selected_paths,
+                        };
+                    }
                 }
             }
             Effect::None
@@ -729,6 +739,17 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
             Effect::None
         }
 
+        AppMessage::MultipleFileDiffsLoaded { files } => {
+            state.loading = false;
+            if let Some(repo) = &mut state.current_repo {
+                repo.file_view = crate::state::FileViewState::MultipleDiffs {
+                    files,
+                    view_mode: crate::state::DiffViewMode::Unified,
+                };
+            }
+            Effect::None
+        }
+
         AppMessage::BinaryFileDetected { path, size } => {
             state.loading = false;
             if let Some(repo) = &mut state.current_repo {
@@ -742,8 +763,14 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
 
         AppMessage::DiffViewModeChanged(mode) => {
             if let Some(repo) = &mut state.current_repo {
-                if let crate::state::FileViewState::Diff { view_mode, .. } = &mut repo.file_view {
-                    *view_mode = mode;
+                match &mut repo.file_view {
+                    crate::state::FileViewState::Diff { view_mode, .. } => {
+                        *view_mode = mode;
+                    }
+                    crate::state::FileViewState::MultipleDiffs { view_mode, .. } => {
+                        *view_mode = mode;
+                    }
+                    _ => {}
                 }
             }
             Effect::None
@@ -787,6 +814,7 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
 
         AppMessage::CommitChangesRequested { summary, description, amend, push } => {
             if let Some(repo) = &state.current_repo {
+                state.loading = true;
                 let full_message = if description.is_empty() {
                     summary.clone()
                 } else {

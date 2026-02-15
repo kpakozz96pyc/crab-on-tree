@@ -123,4 +123,10 @@ pub enum Effect {
         repo_path: PathBuf,
         file_path: PathBuf,
     },
+
+    /// Load multiple file diffs.
+    LoadMultipleFileDiffs {
+        repo_path: PathBuf,
+        file_paths: Vec<PathBuf>,
+    },
 }
