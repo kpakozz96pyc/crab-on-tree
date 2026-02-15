@@ -5,14 +5,6 @@
 use crabontree_app::AppMessage;
 use eframe::egui;
 
-/// Active panel for keyboard navigation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ActivePanel {
-    BranchTree,
-    ChangedFiles,
-    FileViewer,
-}
-
 /// Keyboard action to be taken.
 pub enum KeyboardAction {
     None,
@@ -27,50 +19,28 @@ pub enum KeyboardAction {
 pub fn handle_shortcuts(
     ui: &egui::Ui,
     current_pane: usize,
-    current_panel: ActivePanel,
-) -> (KeyboardAction, usize, ActivePanel) {
+) -> (KeyboardAction, usize) {
     let any_text_focused = ui.memory(|mem| mem.focused().is_some());
 
     if any_text_focused {
-        return (KeyboardAction::None, current_pane, current_panel);
+        return (KeyboardAction::None, current_pane);
     }
 
     // Pane selection: 1, 2, 3
     if ui.input(|i| i.key_pressed(egui::Key::Num1)) {
-        return (
-            KeyboardAction::SetActivePane,
-            0,
-            ActivePanel::BranchTree,
-        );
+        return (KeyboardAction::SetActivePane, 0);
     }
     if ui.input(|i| i.key_pressed(egui::Key::Num2)) {
-        return (
-            KeyboardAction::SetActivePane,
-            1,
-            ActivePanel::ChangedFiles,
-        );
+        return (KeyboardAction::SetActivePane, 1);
     }
     if ui.input(|i| i.key_pressed(egui::Key::Num3)) {
-        return (
-            KeyboardAction::SetActivePane,
-            2,
-            ActivePanel::FileViewer,
-        );
+        return (KeyboardAction::SetActivePane, 2);
     }
 
     // Tab to cycle through panes
     if ui.input(|i| i.key_pressed(egui::Key::Tab) && !i.modifiers.shift) {
         let new_pane = (current_pane + 1) % 3;
-        let new_panel = match new_pane {
-            0 => ActivePanel::BranchTree,
-            1 => ActivePanel::ChangedFiles,
-            _ => ActivePanel::FileViewer,
-        };
-        return (
-            KeyboardAction::SetActivePane,
-            new_pane,
-            new_panel,
-        );
+        return (KeyboardAction::SetActivePane, new_pane);
     }
 
     // Shift+Tab to cycle backward
@@ -80,31 +50,22 @@ pub fn handle_shortcuts(
         } else {
             current_pane - 1
         };
-        let new_panel = match new_pane {
-            0 => ActivePanel::BranchTree,
-            1 => ActivePanel::ChangedFiles,
-            _ => ActivePanel::FileViewer,
-        };
-        return (
-            KeyboardAction::SetActivePane,
-            new_pane,
-            new_panel,
-        );
+        return (KeyboardAction::SetActivePane, new_pane);
     }
 
     // 'r' key to refresh
     if ui.input(|i| i.key_pressed(egui::Key::R) && !i.modifiers.ctrl) {
-        return (KeyboardAction::RefreshRepo, current_pane, current_panel);
+        return (KeyboardAction::RefreshRepo, current_pane);
     }
 
     // '?' to show help
     if ui.input(|i| {
         i.key_pressed(egui::Key::Questionmark) || (i.key_pressed(egui::Key::Slash) && i.modifiers.shift)
     }) {
-        return (KeyboardAction::ToggleHelp, current_pane, current_panel);
+        return (KeyboardAction::ToggleHelp, current_pane);
     }
 
-    (KeyboardAction::None, current_pane, current_panel)
+    (KeyboardAction::None, current_pane)
 }
 
 /// Converts a KeyboardAction to an AppMessage.

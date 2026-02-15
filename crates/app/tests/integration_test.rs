@@ -1,20 +1,14 @@
 //! Integration tests for the full application flow.
 
 use crabontree_app::{
-    reduce, AppConfig, AppMessage, AppState, Effect, Job, JobExecutor,
+    reduce, AppMessage, AppState, Effect, Job, JobExecutor,
 };
 use std::path::PathBuf;
 
 #[test]
 fn test_full_open_repository_flow() {
     // Initialize state
-    let mut state = AppState {
-        current_repo: None,
-        loading: false,
-        error: None,
-        config: AppConfig::default(),
-        staging_progress: None,
-    };
+    let mut state = AppState::default();
 
     // Create job executor
     let (executor, mut message_rx) = JobExecutor::new();
@@ -98,11 +92,7 @@ fn test_refresh_repository_flow() {
 
     // First, open the repository
     let mut state = AppState {
-        current_repo: None,
-        loading: false,
-        error: None,
-        config: AppConfig::default(),
-        staging_progress: None,
+        ..AppState::default()
     };
 
     let effect = reduce(&mut state, AppMessage::OpenRepoRequested(repo_path.clone()));
@@ -145,13 +135,7 @@ fn test_refresh_repository_flow() {
 
 #[test]
 fn test_open_invalid_repository() {
-    let mut state = AppState {
-        current_repo: None,
-        loading: false,
-        error: None,
-        config: AppConfig::default(),
-        staging_progress: None,
-    };
+    let mut state = AppState::default();
 
     let (executor, mut message_rx) = JobExecutor::new();
 

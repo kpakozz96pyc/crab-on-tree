@@ -28,7 +28,7 @@ pub fn render(
         let mut action = CommitHistoryAction::None;
 
         ui.push_id("working_directory", |ui| {
-            let is_selected = selected_commit == Some(&WORKING_DIR_HASH.to_string());
+            let is_selected = selected_commit.map(String::as_str) == Some(WORKING_DIR_HASH);
             let status_indicator = if has_working_dir_changes { " *" } else { "" };
             let text = format!("0000000 - Working Directory{}", status_indicator);
 

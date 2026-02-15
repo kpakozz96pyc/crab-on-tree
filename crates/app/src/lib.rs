@@ -25,6 +25,6 @@ pub use job::{Job, JobId};
 pub use message::AppMessage;
 pub use reducer::reduce;
 pub use state::{
-    AppState, BranchInfo, BranchTreeState, ChangedFilesState, DiffViewMode, FileTreeNode,
-    FileTreeState, FileViewState, LayoutConfig, RepoState, StagingProgress, TagInfo,
+    AppState, BranchConflictDialog, BranchInfo, BranchTreeState, ChangedFilesState,
+    CheckoutChangesDialog, DiffViewMode, FileViewState, RepoState, StagingProgress, TagInfo,
 };

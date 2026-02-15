@@ -8,74 +8,102 @@ pub enum ChangedFilesAction {
     SelectFile(PathBuf),
 }
 
+fn render_section(
+    ui: &mut egui::Ui,
+    id: &str,
+    title: &str,
+    files: &[crabontree_app::WorkingDirFile],
+    selected_file: Option<&PathBuf>,
+    action: &mut ChangedFilesAction,
+) {
+    if files.is_empty() {
+        return;
+    }
+
+    egui::CollapsingHeader::new(format!("{} ({})", title, files.len()))
+        .id_source(id)
+        .default_open(true)
+        .show(ui, |ui| {
+            for (idx, file) in files.iter().enumerate() {
+                ui.push_id(format!("{}_{}", id, idx), |ui| {
+                    let is_selected = selected_file == Some(&file.path);
+                    if FileRow::new(&file.path, &file.status, is_selected).render(ui) {
+                        *action = ChangedFilesAction::SelectFile(file.path.clone());
+                    }
+                });
+            }
+        });
+}
+
 pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState) -> ChangedFilesAction {
     let mut action = ChangedFilesAction::None;
+    let selected_file = files.selected_file.as_ref();
 
-    if !files.staged.is_empty() {
-        egui::CollapsingHeader::new(format!("Staged ({})", files.staged.len()))
-            .id_source("changed_files_staged")
+    // Render commit message section if available
+    if !files.commit_message.is_empty() {
+        egui::CollapsingHeader::new("Commit Message")
+            .id_source("changed_files_commit_message")
             .default_open(true)
             .show(ui, |ui| {
-                for (idx, file) in files.staged.iter().enumerate() {
-                    ui.push_id(format!("staged_{}", idx), |ui| {
-                        let is_selected = files.selected_file.as_ref() == Some(&file.path);
-                        if FileRow::new(&file.path, &file.status, is_selected).render(ui) {
-                            action = ChangedFilesAction::SelectFile(file.path.clone());
-                        }
+                egui::ScrollArea::vertical()
+                    .max_height(200.0)
+                    .show(ui, |ui| {
+                        ui.add(
+                            egui::TextEdit::multiline(&mut files.commit_message.as_str())
+                                .desired_width(f32::INFINITY)
+                                .interactive(false)
+                                .font(egui::TextStyle::Monospace)
+                        );
                     });
-                }
             });
+        ui.add_space(5.0);
+    }
+
+    if !files.staged.is_empty() {
+        render_section(
+            ui,
+            "changed_files_staged",
+            "Staged",
+            &files.staged,
+            selected_file,
+            &mut action,
+        );
         ui.add_space(5.0);
     }
 
     if !files.unstaged.is_empty() {
-        egui::CollapsingHeader::new(format!("Unstaged ({})", files.unstaged.len()))
-            .id_source("changed_files_unstaged")
-            .default_open(true)
-            .show(ui, |ui| {
-                for (idx, file) in files.unstaged.iter().enumerate() {
-                    ui.push_id(format!("unstaged_{}", idx), |ui| {
-                        let is_selected = files.selected_file.as_ref() == Some(&file.path);
-                        if FileRow::new(&file.path, &file.status, is_selected).render(ui) {
-                            action = ChangedFilesAction::SelectFile(file.path.clone());
-                        }
-                    });
-                }
-            });
+        render_section(
+            ui,
+            "changed_files_unstaged",
+            "Unstaged",
+            &files.unstaged,
+            selected_file,
+            &mut action,
+        );
         ui.add_space(5.0);
     }
 
     if !files.untracked.is_empty() {
-        egui::CollapsingHeader::new(format!("Untracked ({})", files.untracked.len()))
-            .id_source("changed_files_untracked")
-            .default_open(true)
-            .show(ui, |ui| {
-                for (idx, file) in files.untracked.iter().enumerate() {
-                    ui.push_id(format!("untracked_{}", idx), |ui| {
-                        let is_selected = files.selected_file.as_ref() == Some(&file.path);
-                        if FileRow::new(&file.path, &file.status, is_selected).render(ui) {
-                            action = ChangedFilesAction::SelectFile(file.path.clone());
-                        }
-                    });
-                }
-            });
+        render_section(
+            ui,
+            "changed_files_untracked",
+            "Untracked",
+            &files.untracked,
+            selected_file,
+            &mut action,
+        );
         ui.add_space(5.0);
     }
 
     if !files.conflicted.is_empty() {
-        egui::CollapsingHeader::new(format!("Conflicted ({})", files.conflicted.len()))
-            .id_source("changed_files_conflicted")
-            .default_open(true)
-            .show(ui, |ui| {
-                for (idx, file) in files.conflicted.iter().enumerate() {
-                    ui.push_id(format!("conflicted_{}", idx), |ui| {
-                        let is_selected = files.selected_file.as_ref() == Some(&file.path);
-                        if FileRow::new(&file.path, &file.status, is_selected).render(ui) {
-                            action = ChangedFilesAction::SelectFile(file.path.clone());
-                        }
-                    });
-                }
-            });
+        render_section(
+            ui,
+            "changed_files_conflicted",
+            "Conflicted",
+            &files.conflicted,
+            selected_file,
+            &mut action,
+        );
     }
 
     action

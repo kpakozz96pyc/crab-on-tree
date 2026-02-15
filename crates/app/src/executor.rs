@@ -83,7 +83,16 @@ fn worker_thread(
                 Job::LoadBranchTree(path) => execute_load_branch_tree(path).await,
                 Job::CheckoutBranch { repo_path, branch_name } =>
                     execute_checkout_branch(repo_path, branch_name).await,
-                Job::LoadFileTree(path) => execute_load_file_tree(path).await,
+                Job::CheckUncommittedChanges { repo_path, branch_name, is_remote } =>
+                    execute_check_uncommitted_changes(repo_path, branch_name, is_remote).await,
+                Job::StashAndCheckout { repo_path, branch_name, is_remote, from_branch } =>
+                    execute_stash_and_checkout(repo_path, branch_name, is_remote, from_branch).await,
+                Job::DiscardAndCheckout { repo_path, branch_name, is_remote } =>
+                    execute_discard_and_checkout(repo_path, branch_name, is_remote).await,
+                Job::CheckLocalBranchExists { repo_path, remote_branch, local_name } =>
+                    execute_check_local_branch_exists(repo_path, remote_branch, local_name).await,
+                Job::CheckoutRemoteBranch { repo_path, remote_branch, local_name, override_existing } =>
+                    execute_checkout_remote_branch(repo_path, remote_branch, local_name, override_existing).await,
                 Job::LoadChangedFiles(path) => execute_load_changed_files(path).await,
                 Job::LoadFileContent { repo_path, file_path } =>
                     execute_load_file_content(repo_path, file_path).await,
@@ -112,6 +121,20 @@ fn worker_thread(
 
         tracing::info!("Worker thread shutting down");
     });
+}
+
+async fn run_repo_job<R, F>(path: PathBuf, f: F) -> anyhow::Result<R>
+where
+    R: Send + 'static,
+    F: FnOnce(GitRepository) -> anyhow::Result<R> + Send + 'static,
+{
+    tokio::task::spawn_blocking(move || -> anyhow::Result<R> {
+        let repo = GitRepository::open(&path)
+            .with_context(|| format!("Failed to open repository at {}", path.display()))?;
+        f(repo)
+    })
+    .await
+    .context("Task panicked")?
 }
 
 /// Execute the OpenRepo job.
@@ -180,15 +203,11 @@ async fn execute_refresh_repo(path: PathBuf) -> anyhow::Result<AppMessage> {
 /// Execute the LoadCommitHistory job.
 #[instrument(skip(path))]
 async fn execute_load_commit_history(path: PathBuf) -> anyhow::Result<AppMessage> {
-    let commits = tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
-        let repo = GitRepository::open(&path)
-            .with_context(|| format!("Failed to open repository at {}", path.display()))?;
-
+    let commits = run_repo_job(path, |repo| {
         repo.get_commit_history(Some(100))
             .context("Failed to get commit history")
     })
-    .await
-    .context("Task panicked")??;
+    .await?;
 
     Ok(AppMessage::CommitHistoryLoaded(commits))
 }
@@ -213,15 +232,11 @@ async fn execute_load_commit_diff(repo_path: PathBuf, commit_hash: String) -> an
 /// Execute the LoadWorkingDirStatus job.
 #[instrument(skip(path))]
 async fn execute_load_working_dir_status(path: PathBuf) -> anyhow::Result<AppMessage> {
-    let files = tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
-        let repo = GitRepository::open(&path)
-            .with_context(|| format!("Failed to open repository at {}", path.display()))?;
-
+    let files = run_repo_job(path, |repo| {
         repo.get_working_dir_status()
             .context("Failed to get working directory status")
     })
-    .await
-    .context("Task panicked")??;
+    .await?;
 
     Ok(AppMessage::WorkingDirStatusLoaded(files))
 }
@@ -265,17 +280,13 @@ async fn execute_unstage_file(repo_path: PathBuf, file_path: PathBuf) -> anyhow:
 /// Execute the StageAll job.
 #[instrument(skip(path))]
 async fn execute_stage_all(path: PathBuf) -> anyhow::Result<AppMessage> {
-    tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
-        let repo = GitRepository::open(&path)
-            .with_context(|| format!("Failed to open repository at {}", path.display()))?;
-
+    run_repo_job(path, |repo| {
         repo.stage_all()
-            .context("Failed to stage all changes")?;
+        .context("Failed to stage all changes")?;
 
         Ok(())
     })
-    .await
-    .context("Task panicked")??;
+    .await?;
 
     Ok(AppMessage::StagingCompleted)
 }
@@ -283,17 +294,13 @@ async fn execute_stage_all(path: PathBuf) -> anyhow::Result<AppMessage> {
 /// Execute the UnstageAll job.
 #[instrument(skip(path))]
 async fn execute_unstage_all(path: PathBuf) -> anyhow::Result<AppMessage> {
-    tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
-        let repo = GitRepository::open(&path)
-            .with_context(|| format!("Failed to open repository at {}", path.display()))?;
-
+    run_repo_job(path, |repo| {
         repo.unstage_all()
             .context("Failed to unstage all changes")?;
 
         Ok(())
     })
-    .await
-    .context("Task panicked")??;
+    .await?;
 
     Ok(AppMessage::StagingCompleted)
 }
@@ -321,15 +328,11 @@ async fn execute_create_commit(repo_path: PathBuf, message: String) -> anyhow::R
 /// Execute the LoadAuthorIdentity job.
 #[instrument(skip(path))]
 async fn execute_load_author_identity(path: PathBuf) -> anyhow::Result<AppMessage> {
-    let (name, email) = tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
-        let repo = GitRepository::open(&path)
-            .with_context(|| format!("Failed to open repository at {}", path.display()))?;
-
+    let (name, email) = run_repo_job(path, |repo| {
         repo.get_author_identity()
             .context("Failed to get author identity")
     })
-    .await
-    .context("Task panicked")??;
+    .await?;
 
     Ok(AppMessage::AuthorIdentityLoaded { name, email })
 }
@@ -395,6 +398,7 @@ async fn execute_load_branch_tree(path: PathBuf) -> anyhow::Result<AppMessage> {
             tags: tag_list,
             current_branch: head,
             expanded_sections: expanded,
+            selected_branch: None,
         })
     })
     .await
@@ -420,100 +424,6 @@ async fn execute_checkout_branch(repo_path: PathBuf, branch_name: String) -> any
     .context("Task panicked")??;
 
     Ok(AppMessage::BranchCheckedOut(branch_name))
-}
-
-/// Execute the LoadFileTree job.
-#[instrument(skip(path))]
-async fn execute_load_file_tree(path: PathBuf) -> anyhow::Result<AppMessage> {
-    use std::collections::{HashMap, HashSet};
-
-    let file_tree = tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
-        let repo = GitRepository::open(&path)
-            .with_context(|| format!("Failed to open repository at {}", path.display()))?;
-
-        let entries = repo.get_repository_tree()
-            .context("Failed to get repository tree")?;
-
-        // Get changed files to mark them in the tree
-        let changed_files = repo.get_working_dir_status()
-            .context("Failed to get working directory status")?;
-
-        let changed_paths: HashSet<_> = changed_files.iter()
-            .map(|f| f.path.clone())
-            .collect();
-
-        // Build tree structure
-        fn build_tree(
-            entries: &[(PathBuf, bool, u64)],
-            changed_paths: &HashSet<PathBuf>,
-        ) -> crate::state::FileTreeNode {
-            use std::path::Path;
-
-            let mut root_children = Vec::new();
-            let mut dir_map: HashMap<PathBuf, Vec<crate::state::FileTreeNode>> = HashMap::new();
-
-            for (path, is_dir, size) in entries {
-                let name = path.file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("")
-                    .to_string();
-
-                let node = if *is_dir {
-                    crate::state::FileTreeNode::Directory {
-                        path: path.clone(),
-                        name,
-                        children: Vec::new(),
-                        is_expanded: false,
-                        has_changes: false,
-                    }
-                } else {
-                    let status = changed_paths.get(path).map(|_| {
-                        // Find the actual status
-                        crabontree_git::WorkingDirStatus::Modified
-                    });
-
-                    crate::state::FileTreeNode::File {
-                        path: path.clone(),
-                        name,
-                        status,
-                        size: *size,
-                    }
-                };
-
-                if let Some(parent) = path.parent() {
-                    if parent == Path::new("") {
-                        root_children.push(node);
-                    } else {
-                        dir_map.entry(parent.to_path_buf())
-                            .or_insert_with(Vec::new)
-                            .push(node);
-                    }
-                } else {
-                    root_children.push(node);
-                }
-            }
-
-            crate::state::FileTreeNode::Directory {
-                path: PathBuf::from(""),
-                name: "/".to_string(),
-                children: root_children,
-                is_expanded: true,
-                has_changes: !changed_paths.is_empty(),
-            }
-        }
-
-        let root = build_tree(&entries, &changed_paths);
-
-        Ok(crate::state::FileTreeState {
-            root,
-            expanded_paths: HashSet::new(),
-            selected_path: None,
-        })
-    })
-    .await
-    .context("Task panicked")??;
-
-    Ok(AppMessage::FileTreeLoaded(file_tree))
 }
 
 /// Execute the LoadChangedFiles job.
@@ -549,6 +459,7 @@ async fn execute_load_changed_files(path: PathBuf) -> anyhow::Result<AppMessage>
             untracked,
             conflicted,
             selected_file: None,
+            commit_message: String::new(), // Empty for working directory
         })
     })
     .await
@@ -625,4 +536,263 @@ async fn execute_load_file_diff(repo_path: PathBuf, file_path: PathBuf) -> anyho
         path: file_path,
         hunks,
     })
+}
+
+/// Execute the CheckUncommittedChanges job.
+#[instrument(skip(repo_path, branch_name))]
+async fn execute_check_uncommitted_changes(
+    repo_path: PathBuf,
+    branch_name: String,
+    is_remote: bool,
+) -> anyhow::Result<AppMessage> {
+    let branch_clone = branch_name.clone();
+    let repo_path_clone1 = repo_path.clone();
+
+    let has_changes = tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+        let repo = GitRepository::open(&repo_path_clone1)
+            .with_context(|| format!("Failed to open repository at {}", repo_path_clone1.display()))?;
+
+        repo.has_uncommitted_changes()
+            .context("Failed to check for uncommitted changes")
+    })
+    .await
+    .context("Task panicked")??;
+
+    if has_changes {
+        // Has changes - show dialog
+        Ok(AppMessage::ShowCheckoutWithChangesDialog {
+            branch_name,
+            is_remote,
+        })
+    } else if is_remote {
+        // No changes but remote branch - check if local name exists
+        let local_name = if let Some((_remote, branch)) = branch_name.split_once('/') {
+            branch.to_string()
+        } else {
+            branch_name.clone()
+        };
+
+        let local_name_clone = local_name.clone();
+        let repo_path_clone2 = repo_path.clone();
+
+        let exists = tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+            let repo = GitRepository::open(&repo_path_clone2)
+                .with_context(|| format!("Failed to open repository at {}", repo_path_clone2.display()))?;
+
+            repo.local_branch_exists(&local_name_clone)
+                .context("Failed to check if local branch exists")
+        })
+        .await
+        .context("Task panicked")??;
+
+        if exists {
+            // Local branch exists - just checkout the local branch instead
+            let repo_path_clone3 = repo_path.clone();
+            let local_name_clone2 = local_name.clone();
+
+            tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+                let repo = GitRepository::open(&repo_path_clone3)
+                    .with_context(|| format!("Failed to open repository at {}", repo_path_clone3.display()))?;
+
+                repo.checkout_branch(&local_name_clone2)
+                    .context("Failed to checkout local branch")
+            })
+            .await
+            .context("Task panicked")??;
+
+            Ok(AppMessage::BranchCheckedOut(local_name))
+        } else {
+            // No local branch - create tracking branch
+            Ok(AppMessage::CheckoutRemoteOverride {
+                remote_branch: branch_name,
+                local_name,
+            })
+        }
+    } else {
+        // No changes and local branch - checkout directly
+        tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+            let repo = GitRepository::open(&repo_path)
+                .with_context(|| format!("Failed to open repository at {}", repo_path.display()))?;
+
+            repo.checkout_branch(&branch_clone)
+                .context("Failed to checkout branch")
+        })
+        .await
+        .context("Task panicked")??;
+
+        Ok(AppMessage::BranchCheckedOut(branch_name))
+    }
+}
+
+/// Execute the StashAndCheckout job.
+#[instrument(skip(repo_path, branch_name, from_branch))]
+async fn execute_stash_and_checkout(
+    repo_path: PathBuf,
+    branch_name: String,
+    is_remote: bool,
+    from_branch: String,
+) -> anyhow::Result<AppMessage> {
+    let branch_clone = branch_name.clone();
+    let from_clone = from_branch.clone();
+    let repo_path_clone = repo_path.clone();
+
+    tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+        let mut repo = GitRepository::open(&repo_path_clone)
+            .with_context(|| format!("Failed to open repository at {}", repo_path_clone.display()))?;
+
+        // Create stash message with datetime
+        let now = chrono::Local::now();
+        let stash_msg = format!(
+            "WIP: switching from {} to {} - {}",
+            from_clone,
+            branch_clone,
+            now.format("%Y-%m-%d %H:%M:%S")
+        );
+
+        // Stash changes
+        let stash_name = repo.stash_changes(&stash_msg)
+            .context("Failed to stash changes")?;
+
+        tracing::info!("Stashed changes: {}", stash_name);
+
+        Ok(stash_name)
+    })
+    .await
+    .context("Task panicked")??;
+
+    // After stashing, proceed with checkout
+    if is_remote {
+        let local_name = if let Some((_remote, branch)) = branch_name.split_once('/') {
+            branch.to_string()
+        } else {
+            branch_name.clone()
+        };
+
+        Ok(AppMessage::CheckoutRemoteOverride {
+            remote_branch: branch_name,
+            local_name,
+        })
+    } else {
+        let branch_name_clone = branch_name.clone();
+        tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+            let repo = GitRepository::open(&repo_path)
+                .with_context(|| format!("Failed to open repository at {}", repo_path.display()))?;
+
+            repo.checkout_branch(&branch_name_clone)
+                .context("Failed to checkout branch")
+        })
+        .await
+        .context("Task panicked")??;
+
+        Ok(AppMessage::BranchCheckedOut(branch_name))
+    }
+}
+
+/// Execute the DiscardAndCheckout job.
+#[instrument(skip(repo_path, branch_name))]
+async fn execute_discard_and_checkout(
+    repo_path: PathBuf,
+    branch_name: String,
+    is_remote: bool,
+) -> anyhow::Result<AppMessage> {
+    let branch_clone = branch_name.clone();
+    let repo_path_clone = repo_path.clone();
+
+    tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+        let repo = GitRepository::open(&repo_path_clone)
+            .with_context(|| format!("Failed to open repository at {}", repo_path_clone.display()))?;
+
+        // Discard all changes
+        repo.discard_all_changes()
+            .context("Failed to discard changes")?;
+
+        tracing::info!("Discarded all changes");
+
+        Ok(())
+    })
+    .await
+    .context("Task panicked")??;
+
+    // After discarding, proceed with checkout
+    if is_remote {
+        let local_name = if let Some((_remote, branch)) = branch_name.split_once('/') {
+            branch.to_string()
+        } else {
+            branch_name.clone()
+        };
+
+        Ok(AppMessage::CheckoutRemoteOverride {
+            remote_branch: branch_name,
+            local_name,
+        })
+    } else {
+        tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+            let repo = GitRepository::open(&repo_path)
+                .with_context(|| format!("Failed to open repository at {}", repo_path.display()))?;
+
+            repo.checkout_branch(&branch_clone)
+                .context("Failed to checkout branch")
+        })
+        .await
+        .context("Task panicked")??;
+
+        Ok(AppMessage::BranchCheckedOut(branch_name))
+    }
+}
+
+/// Execute the CheckLocalBranchExists job.
+#[instrument(skip(repo_path, remote_branch, local_name))]
+async fn execute_check_local_branch_exists(
+    repo_path: PathBuf,
+    remote_branch: String,
+    local_name: String,
+) -> anyhow::Result<AppMessage> {
+    let local_clone = local_name.clone();
+
+    let exists = tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+        let repo = GitRepository::open(&repo_path)
+            .with_context(|| format!("Failed to open repository at {}", repo_path.display()))?;
+
+        repo.local_branch_exists(&local_clone)
+            .context("Failed to check if local branch exists")
+    })
+    .await
+    .context("Task panicked")??;
+
+    if exists {
+        Ok(AppMessage::ShowRemoteBranchConflictDialog {
+            remote_branch,
+            local_name,
+        })
+    } else {
+        // No conflict - create tracking branch
+        Ok(AppMessage::CheckoutRemoteOverride {
+            remote_branch,
+            local_name,
+        })
+    }
+}
+
+/// Execute the CheckoutRemoteBranch job.
+#[instrument(skip(repo_path, remote_branch, local_name))]
+async fn execute_checkout_remote_branch(
+    repo_path: PathBuf,
+    remote_branch: String,
+    local_name: String,
+    override_existing: bool,
+) -> anyhow::Result<AppMessage> {
+    let remote_clone = remote_branch.clone();
+    let local_clone = local_name.clone();
+
+    tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
+        let repo = GitRepository::open(&repo_path)
+            .with_context(|| format!("Failed to open repository at {}", repo_path.display()))?;
+
+        repo.create_tracking_branch(&remote_clone, &local_clone, override_existing)
+            .context("Failed to create tracking branch")
+    })
+    .await
+    .context("Task panicked")??;
+
+    Ok(AppMessage::BranchCheckedOut(local_name))
 }

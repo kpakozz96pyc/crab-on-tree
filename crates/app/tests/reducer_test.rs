@@ -1,17 +1,11 @@
 //! Tests for the state reducer.
 
-use crabontree_app::{reduce, AppConfig, AppMessage, AppState, Effect, RepoState};
+use crabontree_app::{reduce, AppMessage, AppState, Effect, RepoState};
 use crabontree_git::StatusSummary;
 use std::path::PathBuf;
 
 fn default_state() -> AppState {
-    AppState {
-        current_repo: None,
-        loading: false,
-        error: None,
-        config: AppConfig::default(),
-        staging_progress: None,
-    }
+    AppState::default()
 }
 
 #[test]
@@ -85,17 +79,12 @@ fn test_repo_opened_duplicate_recent() {
 fn test_close_repo() {
     let mut state = default_state();
     state.current_repo = Some(RepoState {
-        path: PathBuf::from("/test/repo"),
-        head: "main".to_string(),
-        branches: vec!["main".to_string()],
-        status_summary: StatusSummary::default(),
-        commits: Vec::new(),
-        selected_commit: None,
-        commit_diff: None,
-        working_dir_files: Vec::new(),
-        commit_message: String::new(),
-        author_name: String::new(),
-        author_email: String::new(),
+        ..RepoState::new(
+            PathBuf::from("/test/repo"),
+            "main".to_string(),
+            vec!["main".to_string()],
+            StatusSummary::default(),
+        )
     });
 
     let effect = reduce(&mut state, AppMessage::CloseRepo);
@@ -110,17 +99,12 @@ fn test_refresh_repo() {
     let path = PathBuf::from("/test/repo");
 
     state.current_repo = Some(RepoState {
-        path: path.clone(),
-        head: "main".to_string(),
-        branches: vec!["main".to_string()],
-        status_summary: StatusSummary::default(),
-        commits: Vec::new(),
-        selected_commit: None,
-        commit_diff: None,
-        working_dir_files: Vec::new(),
-        commit_message: String::new(),
-        author_name: String::new(),
-        author_email: String::new(),
+        ..RepoState::new(
+            path.clone(),
+            "main".to_string(),
+            vec!["main".to_string()],
+            StatusSummary::default(),
+        )
     });
 
     let effect = reduce(&mut state, AppMessage::RefreshRepo);
@@ -144,17 +128,12 @@ fn test_refresh_repo_no_repo() {
 fn test_repo_refreshed() {
     let mut state = default_state();
     state.current_repo = Some(RepoState {
-        path: PathBuf::from("/test/repo"),
-        head: "main".to_string(),
-        branches: vec!["main".to_string()],
-        status_summary: StatusSummary::default(),
-        commits: Vec::new(),
-        selected_commit: None,
-        commit_diff: None,
-        working_dir_files: Vec::new(),
-        commit_message: String::new(),
-        author_name: String::new(),
-        author_email: String::new(),
+        ..RepoState::new(
+            PathBuf::from("/test/repo"),
+            "main".to_string(),
+            vec!["main".to_string()],
+            StatusSummary::default(),
+        )
     });
 
     state.loading = true;

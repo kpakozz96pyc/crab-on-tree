@@ -81,8 +81,42 @@ pub enum Job {
         branch_name: String,
     },
 
-    /// Load file tree.
-    LoadFileTree(PathBuf),
+    /// Check if repository has uncommitted changes.
+    CheckUncommittedChanges {
+        repo_path: PathBuf,
+        branch_name: String,
+        is_remote: bool,
+    },
+
+    /// Stash changes and checkout branch.
+    StashAndCheckout {
+        repo_path: PathBuf,
+        branch_name: String,
+        is_remote: bool,
+        from_branch: String,
+    },
+
+    /// Discard changes and checkout branch.
+    DiscardAndCheckout {
+        repo_path: PathBuf,
+        branch_name: String,
+        is_remote: bool,
+    },
+
+    /// Check if local branch name exists (for remote branch checkout).
+    CheckLocalBranchExists {
+        repo_path: PathBuf,
+        remote_branch: String,
+        local_name: String,
+    },
+
+    /// Checkout remote branch (create local tracking branch).
+    CheckoutRemoteBranch {
+        repo_path: PathBuf,
+        remote_branch: String,
+        local_name: String,
+        override_existing: bool,
+    },
 
     /// Load changed files.
     LoadChangedFiles(PathBuf),

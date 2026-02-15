@@ -2,20 +2,21 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use crabontree_git::{Commit, FileDiff, StatusSummary, WorkingDirFile, WorkingDirStatus, DiffHunk};
+use crabontree_git::{Commit, DiffHunk, FileDiff, StatusSummary, WorkingDirFile};
 
-/// Layout configuration for 3-pane mode.
+/// Dialog for handling uncommitted changes before checkout.
 #[derive(Debug, Clone)]
-pub struct LayoutConfig {
-    pub pane_widths: [f32; 3],
+pub struct CheckoutChangesDialog {
+    pub branch_name: String,
+    pub is_remote: bool,
 }
 
-impl Default for LayoutConfig {
-    fn default() -> Self {
-        Self {
-            pane_widths: [0.25, 0.35, 0.40], // Commit History, Changed Files, Diff Viewer
-        }
-    }
+/// Dialog for handling remote branch name conflicts.
+#[derive(Debug, Clone)]
+pub struct BranchConflictDialog {
+    pub remote_branch: String,
+    pub local_name: String,
+    pub new_name_input: String,
 }
 
 /// Main application state.
@@ -26,7 +27,22 @@ pub struct AppState {
     pub error: Option<String>,
     pub config: super::AppConfig,
     pub staging_progress: Option<StagingProgress>,
-    pub layout_config: LayoutConfig,
+    pub checkout_changes_dialog: Option<CheckoutChangesDialog>,
+    pub branch_conflict_dialog: Option<BranchConflictDialog>,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            current_repo: None,
+            loading: false,
+            error: None,
+            config: super::AppConfig::default(),
+            staging_progress: None,
+            checkout_changes_dialog: None,
+            branch_conflict_dialog: None,
+        }
+    }
 }
 
 /// Progress information for staging operations.
@@ -62,32 +78,7 @@ pub struct BranchTreeState {
     pub tags: Vec<TagInfo>,
     pub current_branch: String,
     pub expanded_sections: HashSet<String>,
-}
-
-/// File tree node.
-#[derive(Debug, Clone)]
-pub enum FileTreeNode {
-    Directory {
-        path: PathBuf,
-        name: String,
-        children: Vec<FileTreeNode>,
-        is_expanded: bool,
-        has_changes: bool,
-    },
-    File {
-        path: PathBuf,
-        name: String,
-        status: Option<WorkingDirStatus>,
-        size: u64,
-    },
-}
-
-/// File tree state (Pane 2).
-#[derive(Debug, Clone)]
-pub struct FileTreeState {
-    pub root: FileTreeNode,
-    pub expanded_paths: HashSet<PathBuf>,
-    pub selected_path: Option<PathBuf>,
+    pub selected_branch: Option<String>, // Selected branch (for keyboard navigation)
 }
 
 /// Changed files state (Pane 3).
@@ -98,6 +89,7 @@ pub struct ChangedFilesState {
     pub untracked: Vec<WorkingDirFile>,
     pub conflicted: Vec<WorkingDirFile>,
     pub selected_file: Option<PathBuf>,
+    pub commit_message: String,
 }
 
 /// Diff view mode.
@@ -148,9 +140,29 @@ pub struct RepoState {
     pub commit_message: String,
     pub author_name: String,
     pub author_email: String,
-    // New 4-pane state
+    // Docking-pane state
     pub branch_tree: Option<BranchTreeState>,
-    pub file_tree: Option<FileTreeState>,
     pub changed_files: Option<ChangedFilesState>,
     pub file_view: FileViewState,
+}
+
+impl RepoState {
+    pub fn new(path: PathBuf, head: String, branches: Vec<String>, status_summary: StatusSummary) -> Self {
+        Self {
+            path,
+            head,
+            branches,
+            status_summary,
+            commits: Vec::new(),
+            selected_commit: None,
+            commit_diff: None,
+            working_dir_files: Vec::new(),
+            commit_message: String::new(),
+            author_name: String::new(),
+            author_email: String::new(),
+            branch_tree: None,
+            changed_files: None,
+            file_view: FileViewState::default(),
+        }
+    }
 }

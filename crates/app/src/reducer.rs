@@ -15,23 +15,7 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
 
         AppMessage::RepoOpened { path, head, branches, status } => {
             state.loading = false;
-            state.current_repo = Some(RepoState {
-                path: path.clone(),
-                head,
-                branches,
-                status_summary: status,
-                commits: Vec::new(),
-                selected_commit: None,
-                commit_diff: None,
-                working_dir_files: Vec::new(),
-                commit_message: String::new(),
-                author_name: String::new(),
-                author_email: String::new(),
-                branch_tree: None,
-                file_tree: None,
-                changed_files: None,
-                file_view: crate::state::FileViewState::default(),
-            });
+            state.current_repo = Some(RepoState::new(path.clone(), head, branches, status));
 
             // Add to recent repos and save config
             if !state.config.recent_repos.contains(&path) {
@@ -148,12 +132,19 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
                     use crate::WorkingDirFile;
                     use crate::WorkingDirStatus;
 
+                    // Get the commit message from the selected commit
+                    let commit_message = repo.commits.iter()
+                        .find(|c| c.hash == commit_hash)
+                        .map(|c| c.message.clone())
+                        .unwrap_or_default();
+
                     let mut changed_files = ChangedFilesState {
                         staged: Vec::new(),
                         unstaged: Vec::new(),
                         untracked: Vec::new(),
                         conflicted: Vec::new(),
                         selected_file: None,
+                        commit_message,
                     };
 
                     // Convert FileDiff entries to WorkingDirFile entries
@@ -353,13 +344,121 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
             Effect::None
         }
 
-        AppMessage::BranchCheckoutRequested(branch_name) => {
+        AppMessage::BranchSelected { name, is_remote: _ } => {
+            if let Some(repo) = &mut state.current_repo {
+                if let Some(tree) = &mut repo.branch_tree {
+                    tree.selected_branch = Some(name);
+                }
+            }
+            Effect::None
+        }
+
+        AppMessage::BranchCheckoutRequested { name, is_remote } => {
             if let Some(repo) = &state.current_repo {
-                state.loading = true;
-                Effect::CheckoutBranch {
+                // Check for uncommitted changes first
+                Effect::CheckUncommittedChanges {
+                    repo_path: repo.path.clone(),
+                    branch_name: name,
+                    is_remote,
+                }
+            } else {
+                Effect::None
+            }
+        }
+
+        AppMessage::ShowCheckoutWithChangesDialog { branch_name, is_remote } => {
+            state.checkout_changes_dialog = Some(crate::state::CheckoutChangesDialog {
+                branch_name,
+                is_remote,
+            });
+            Effect::None
+        }
+
+        AppMessage::CheckoutWithStash { branch_name, is_remote } => {
+            state.checkout_changes_dialog = None; // Close dialog
+            if let Some(repo) = &state.current_repo {
+                Effect::StashAndCheckout {
                     repo_path: repo.path.clone(),
                     branch_name,
+                    is_remote,
+                    from_branch: repo.head.clone(),
                 }
+            } else {
+                Effect::None
+            }
+        }
+
+        AppMessage::CheckoutWithDiscard { branch_name, is_remote } => {
+            state.checkout_changes_dialog = None; // Close dialog
+            if let Some(repo) = &state.current_repo {
+                Effect::DiscardAndCheckout {
+                    repo_path: repo.path.clone(),
+                    branch_name,
+                    is_remote,
+                }
+            } else {
+                Effect::None
+            }
+        }
+
+        AppMessage::ShowRemoteBranchConflictDialog { remote_branch, local_name } => {
+            state.branch_conflict_dialog = Some(crate::state::BranchConflictDialog {
+                remote_branch: remote_branch.clone(),
+                local_name: local_name.clone(),
+                new_name_input: local_name, // Default to the suggested name
+            });
+            Effect::None
+        }
+
+        AppMessage::CheckoutRemoteOverride { remote_branch, local_name } => {
+            state.branch_conflict_dialog = None; // Close dialog
+            if let Some(repo) = &state.current_repo {
+                Effect::CheckoutRemoteBranch {
+                    repo_path: repo.path.clone(),
+                    remote_branch,
+                    local_name,
+                    override_existing: true,
+                }
+            } else {
+                Effect::None
+            }
+        }
+
+        AppMessage::CheckoutRemoteRename { remote_branch, new_local_name } => {
+            state.branch_conflict_dialog = None; // Close dialog
+            if let Some(repo) = &state.current_repo {
+                Effect::CheckoutRemoteBranch {
+                    repo_path: repo.path.clone(),
+                    remote_branch,
+                    local_name: new_local_name,
+                    override_existing: false,
+                }
+            } else {
+                Effect::None
+            }
+        }
+
+        AppMessage::ChangesStashed { stash_name } => {
+            tracing::info!("Changes stashed: {}", stash_name);
+            // Refresh repository state after stashing
+            if let Some(repo) = &state.current_repo {
+                Effect::Batch(vec![
+                    Effect::LoadBranchTree(repo.path.clone()),
+                    Effect::LoadWorkingDirStatus(repo.path.clone()),
+                ])
+            } else {
+                Effect::None
+            }
+        }
+
+        AppMessage::ChangesDiscarded => {
+            tracing::info!("Changes discarded");
+            // Refresh repository state after discarding
+            if let Some(repo) = &state.current_repo {
+                Effect::Batch(vec![
+                    Effect::LoadBranchTree(repo.path.clone()),
+                    Effect::LoadWorkingDirStatus(repo.path.clone()),
+                ])
             } else {
                 Effect::None
             }
@@ -374,59 +473,9 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
                 Effect::Batch(vec![
                     Effect::RefreshRepo(repo.path.clone()),
                     Effect::LoadBranchTree(repo.path.clone()),
-                    Effect::LoadFileTree(repo.path.clone()),
                     Effect::LoadChangedFiles(repo.path.clone()),
                     Effect::LoadCommitHistory(repo.path.clone()),
                 ])
-            } else {
-                Effect::None
-            }
-        }
-
-        AppMessage::LoadFileTreeRequested => {
-            state.loading = true;
-            if let Some(repo) = &state.current_repo {
-                Effect::LoadFileTree(repo.path.clone())
-            } else {
-                tracing::warn!("Cannot load file tree: no repository open");
-                Effect::None
-            }
-        }
-
-        AppMessage::FileTreeLoaded(file_tree) => {
-            state.loading = false;
-            if let Some(repo) = &mut state.current_repo {
-                repo.file_tree = Some(file_tree);
-                tracing::info!("Loaded file tree");
-            }
-            Effect::None
-        }
-
-        AppMessage::FileTreeNodeToggled(path) => {
-            if let Some(repo) = &mut state.current_repo {
-                if let Some(tree) = &mut repo.file_tree {
-                    if tree.expanded_paths.contains(&path) {
-                        tree.expanded_paths.remove(&path);
-                    } else {
-                        tree.expanded_paths.insert(path);
-                    }
-                }
-            }
-            Effect::None
-        }
-
-        AppMessage::FileTreeNodeSelected(path) => {
-            if let Some(repo) = &mut state.current_repo {
-                if let Some(tree) = &mut repo.file_tree {
-                    tree.selected_path = Some(path.clone());
-                }
-
-                // Load file content or diff
-                state.loading = true;
-                Effect::LoadFileContent {
-                    repo_path: repo.path.clone(),
-                    file_path: path,
-                }
             } else {
                 Effect::None
             }
@@ -579,10 +628,5 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
             Effect::None
         }
 
-        AppMessage::PaneWidthsUpdated(widths) => {
-            state.layout_config.pane_widths = widths;
-            state.config.pane_widths = widths;
-            Effect::SaveConfig
-        }
     }
 }

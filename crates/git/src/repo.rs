@@ -210,23 +210,30 @@ impl GitRepository {
     /// Get a summary of the working directory status.
     #[instrument(skip(self))]
     pub fn get_status(&self) -> Result<StatusSummary, GitError> {
-        // For Phase 0, we'll use a simplified status implementation
-        // Full status tracking will be implemented in later phases
+        let mut summary = StatusSummary::default();
+        let files = self.get_working_dir_status()?;
 
-        let summary = StatusSummary::default();
-
-        // Try to get basic status using gix-status
-        match self.gix_repo.index() {
-            Ok(_index) => {
-                // For now, we'll just return zeros
-                // Full implementation requires walking the working tree
-                tracing::debug!("Status check completed");
+        for file in files {
+            match file.status {
+                WorkingDirStatus::Modified => summary.modified += 1,
+                WorkingDirStatus::Untracked => summary.untracked += 1,
+                WorkingDirStatus::Deleted => summary.deleted += 1,
+                WorkingDirStatus::Renamed | WorkingDirStatus::TypeChanged => summary.modified += 1,
+                WorkingDirStatus::Conflicted => summary.modified += 1,
             }
-            Err(e) => {
-                tracing::warn!("Failed to get index: {}", e);
+
+            if file.is_staged {
+                summary.added += 1;
             }
         }
 
+        tracing::debug!(
+            "Status summary: modified={}, added={}, deleted={}, untracked={}",
+            summary.modified,
+            summary.added,
+            summary.deleted,
+            summary.untracked
+        );
         Ok(summary)
     }
 
@@ -856,6 +863,97 @@ impl GitRepository {
         self.git2_repo.set_head(&format!("refs/heads/{}", branch_name))?;
 
         tracing::info!("Checked out branch: {}", branch_name);
+        Ok(())
+    }
+
+    /// Check if repository has uncommitted changes (staged or unstaged).
+    #[instrument(skip(self))]
+    pub fn has_uncommitted_changes(&self) -> Result<bool, GitError> {
+        let files = self.get_working_dir_status()?;
+        let has_changes = !files.is_empty();
+        tracing::debug!("Has uncommitted changes: {}", has_changes);
+        Ok(has_changes)
+    }
+
+    /// Stash all changes (staged and unstaged) with a message.
+    #[instrument(skip(self))]
+    pub fn stash_changes(&mut self, message: &str) -> Result<String, GitError> {
+        let (author_name, author_email) = self.get_author_identity()?;
+        let signature = git2::Signature::now(&author_name, &author_email)?;
+
+        let stash_id = self.git2_repo.stash_save(
+            &signature,
+            message,
+            Some(git2::StashFlags::INCLUDE_UNTRACKED),
+        )?;
+
+        let stash_name = format!("stash@{{0}} - {}", message);
+        tracing::info!("Created stash: {} ({})", stash_name, stash_id);
+        Ok(stash_name)
+    }
+
+    /// Discard all changes in working directory and index (hard reset to HEAD).
+    #[instrument(skip(self))]
+    pub fn discard_all_changes(&self) -> Result<(), GitError> {
+        let head = self.git2_repo.head()?;
+        let obj = head.peel(git2::ObjectType::Commit)?;
+
+        // Reset hard to HEAD
+        self.git2_repo.reset(
+            &obj,
+            git2::ResetType::Hard,
+            None,
+        )?;
+
+        tracing::info!("Discarded all changes (reset --hard HEAD)");
+        Ok(())
+    }
+
+    /// Check if a local branch exists.
+    #[instrument(skip(self))]
+    pub fn local_branch_exists(&self, branch_name: &str) -> Result<bool, GitError> {
+        let result = self.git2_repo.find_branch(branch_name, git2::BranchType::Local);
+        match result {
+            Ok(_) => Ok(true),
+            Err(e) if e.code() == git2::ErrorCode::NotFound => Ok(false),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Create a local tracking branch from a remote branch.
+    /// If force is true, will override existing local branch.
+    #[instrument(skip(self))]
+    pub fn create_tracking_branch(
+        &self,
+        remote_branch: &str,
+        local_name: &str,
+        force: bool,
+    ) -> Result<(), GitError> {
+        // Parse remote branch (e.g., "origin/main" -> "refs/remotes/origin/main")
+        let remote_ref = format!("refs/remotes/{}", remote_branch);
+        let remote_commit = self.git2_repo.revparse_single(&remote_ref)?;
+        let commit = remote_commit.peel_to_commit()?;
+
+        // Delete existing branch if force is true
+        if force {
+            if let Ok(mut existing) = self.git2_repo.find_branch(local_name, git2::BranchType::Local) {
+                tracing::info!("Deleting existing branch: {}", local_name);
+                existing.delete()?;
+            }
+        }
+
+        // Create local branch
+        let mut branch = self.git2_repo.branch(local_name, &commit, false)?;
+
+        // Set upstream to track the remote branch
+        branch.set_upstream(Some(remote_branch))?;
+
+        // Checkout the new branch
+        let obj = self.git2_repo.revparse_single(&format!("refs/heads/{}", local_name))?;
+        self.git2_repo.checkout_tree(&obj, None)?;
+        self.git2_repo.set_head(&format!("refs/heads/{}", local_name))?;
+
+        tracing::info!("Created and checked out tracking branch: {} -> {}", local_name, remote_branch);
         Ok(())
     }
 

@@ -48,27 +48,33 @@ struct CrabOnTreeApp {
     executor: JobExecutor,
     message_rx: tokio::sync::mpsc::Receiver<crabontree_app::AppMessage>,
     theme: Theme,
-    active_panel: keyboard::ActivePanel,
     show_shortcuts_help: bool,
     active_pane: usize,
     dock_state: DockState<panes::Pane>,
+    // Store the full dock state before hiding each pane
+    saved_dock_states: std::collections::HashMap<panes::Pane, DockState<panes::Pane>>,
 }
 
 impl CrabOnTreeApp {
-    /// Creates the default 3-pane dock layout
+    /// Creates the default 4-pane dock layout
+    /// Layout: [CommitHistory, Branches] | ChangedFiles | DiffViewer
     fn create_default_dock_layout() -> DockState<panes::Pane> {
-        let mut dock_state = DockState::new(vec![panes::Pane::CommitHistory]);
+        // Start with CommitHistory and Branches as tabs in the left column
+        let mut dock_state = DockState::new(vec![
+            panes::Pane::CommitHistory,
+            panes::Pane::Branches,
+        ]);
 
-        // Split right to create: CommitHistory | DiffViewer (30% | 70%)
-        let [commit_node, _diff_node] = dock_state.main_surface_mut().split_right(
+        // Split right to create: [CommitHistory, Branches] | DiffViewer (30% | 70%)
+        let [left_node, _diff_node] = dock_state.main_surface_mut().split_right(
             NodeIndex::root(),
             0.70, // DiffViewer takes 70% of the width
             vec![panes::Pane::DiffViewer],
         );
 
-        // Split the left node to create: CommitHistory | ChangedFiles | DiffViewer (30% | 40% | 30%)
-        let _split = dock_state.main_surface_mut().split_right(
-            commit_node,
+        // Split left_node to create: [CommitHistory, Branches] | ChangedFiles | DiffViewer
+        let _changed_node = dock_state.main_surface_mut().split_right(
+            left_node,
             0.57, // ChangedFiles takes ~57% of the left 70% (0.70 * 0.57 ≈ 0.40 total)
             vec![panes::Pane::ChangedFiles],
         );
@@ -81,8 +87,6 @@ impl CrabOnTreeApp {
         let theme = Theme::by_name(&config.theme).unwrap_or_else(Theme::dark);
 
         let (executor, message_rx) = JobExecutor::new();
-
-        let pane_widths = config.pane_widths;
 
         // Load or create dock layout
         let dock_state = if let Some(layout_json) = &config.dock_layout {
@@ -107,7 +111,8 @@ impl CrabOnTreeApp {
             error: None,
             config,
             staging_progress: None,
-            layout_config: crabontree_app::LayoutConfig { pane_widths },
+            checkout_changes_dialog: None,
+            branch_conflict_dialog: None,
         };
 
         Self {
@@ -115,10 +120,10 @@ impl CrabOnTreeApp {
             executor,
             message_rx,
             theme,
-            active_panel: keyboard::ActivePanel::BranchTree,
             show_shortcuts_help: false,
             active_pane: 0,
             dock_state,
+            saved_dock_states: std::collections::HashMap::new(),
         }
     }
 
@@ -214,9 +219,6 @@ impl CrabOnTreeApp {
                     branch_name,
                 });
             }
-            Effect::LoadFileTree(_path) => {
-                // File tree pane removed - ignore
-            }
             Effect::LoadChangedFiles(path) => {
                 self.executor
                     .submit(crabontree_app::Job::LoadChangedFiles(path));
@@ -239,20 +241,111 @@ impl CrabOnTreeApp {
                     file_path,
                 });
             }
+            Effect::CheckUncommittedChanges {
+                repo_path,
+                branch_name,
+                is_remote,
+            } => {
+                self.executor.submit(crabontree_app::Job::CheckUncommittedChanges {
+                    repo_path,
+                    branch_name,
+                    is_remote,
+                });
+            }
+            Effect::StashAndCheckout {
+                repo_path,
+                branch_name,
+                is_remote,
+                from_branch,
+            } => {
+                self.executor.submit(crabontree_app::Job::StashAndCheckout {
+                    repo_path,
+                    branch_name,
+                    is_remote,
+                    from_branch,
+                });
+            }
+            Effect::DiscardAndCheckout {
+                repo_path,
+                branch_name,
+                is_remote,
+            } => {
+                self.executor.submit(crabontree_app::Job::DiscardAndCheckout {
+                    repo_path,
+                    branch_name,
+                    is_remote,
+                });
+            }
+            Effect::CheckLocalBranchExists {
+                repo_path,
+                remote_branch,
+                local_name,
+            } => {
+                self.executor.submit(crabontree_app::Job::CheckLocalBranchExists {
+                    repo_path,
+                    remote_branch,
+                    local_name,
+                });
+            }
+            Effect::CheckoutRemoteBranch {
+                repo_path,
+                remote_branch,
+                local_name,
+                override_existing,
+            } => {
+                self.executor.submit(crabontree_app::Job::CheckoutRemoteBranch {
+                    repo_path,
+                    remote_branch,
+                    local_name,
+                    override_existing,
+                });
+            }
         }
     }
 
     fn render_repository_view(&mut self, ui: &mut egui::Ui) {
-        self.render_four_pane_layout(ui);
+        self.render_dock_layout(ui);
     }
 
-    fn render_four_pane_layout(&mut self, ui: &mut egui::Ui) {
+    /// Get list of all visible panes in the dock
+    fn get_visible_panes(&self) -> Vec<panes::Pane> {
+        let mut visible = Vec::new();
+        self.dock_state.iter_all_tabs().for_each(|(_, tab)| {
+            if !visible.contains(tab) {
+                visible.push(*tab);
+            }
+        });
+        visible
+    }
+
+    /// Toggle pane visibility (remove if visible, add if hidden)
+    fn toggle_pane(&mut self, pane: panes::Pane) {
+        // Check if pane already exists
+        if let Some((surface, node, tab_index)) = self.dock_state.find_tab(&pane) {
+            // Pane exists - save the entire dock state and remove the pane
+            if surface == egui_dock::SurfaceIndex::main() {
+                // Clone the current dock state before modifying
+                self.saved_dock_states.insert(pane, self.dock_state.clone());
+                self.dock_state.main_surface_mut().remove_tab((node, tab_index));
+            }
+        } else {
+            // Pane doesn't exist - try to restore the saved dock state
+            if let Some(saved_state) = self.saved_dock_states.remove(&pane) {
+                // Restore the entire dock state to bring back the pane in its original location
+                self.dock_state = saved_state;
+            } else {
+                // No saved state - add to root node as fallback
+                self.dock_state.main_surface_mut().set_focused_node(NodeIndex::root());
+                self.dock_state.main_surface_mut().push_to_focused_leaf(pane);
+            }
+        }
+    }
+
+    fn render_dock_layout(&mut self, ui: &mut egui::Ui) {
         // Handle keyboard shortcuts
-        let (action, new_pane, new_panel) =
-            keyboard::handle_shortcuts(ui, self.active_pane, self.active_panel);
+        let (action, new_pane) = keyboard::handle_shortcuts(ui, self.active_pane);
 
         self.active_pane = new_pane;
-        self.active_panel = new_panel;
 
         match action {
             keyboard::KeyboardAction::ToggleHelp => {
@@ -279,15 +372,8 @@ impl CrabOnTreeApp {
             self.handle_message(crabontree_app::AppMessage::LoadChangedFilesRequested);
         }
 
-        // Extract data we need before entering closures to avoid borrow checker issues
         let repo_data = if let Some(repo) = &self.state.current_repo {
-            (
-                repo.commits.clone(),
-                repo.selected_commit.clone(),
-                !repo.working_dir_files.is_empty(),
-                repo.changed_files.clone(),
-                repo.file_view.clone(),
-            )
+            repo
         } else {
             return;
         };
@@ -297,7 +383,7 @@ impl CrabOnTreeApp {
 
         // Render with DockArea
         let mut viewer = PaneViewer {
-            repo_data: &repo_data,
+            repo_data,
             messages: &mut messages,
         };
 
@@ -313,13 +399,7 @@ impl CrabOnTreeApp {
 
 /// TabViewer implementation for rendering panes in the dock
 struct PaneViewer<'a> {
-    repo_data: &'a (
-        Vec<crabontree_app::Commit>,
-        Option<String>,
-        bool,
-        Option<crabontree_app::ChangedFilesState>,
-        crabontree_app::FileViewState,
-    ),
+    repo_data: &'a crabontree_app::RepoState,
     messages: &'a mut Vec<crabontree_app::AppMessage>,
 }
 
@@ -331,8 +411,7 @@ impl<'a> egui_dock::TabViewer for PaneViewer<'a> {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
-        let (commits, selected_commit, has_working_dir_changes, changed_files, file_view) =
-            self.repo_data;
+        let repo = self.repo_data;
 
         // Create scroll ID outside to avoid temporary value issues
         let scroll_id = format!("{:?}_dock_scroll", tab);
@@ -354,16 +433,16 @@ impl<'a> egui_dock::TabViewer for PaneViewer<'a> {
                 panes::Pane::CommitHistory => {
                     let action = panes::commit_history::render(
                         ui,
-                        commits,
-                        selected_commit.as_ref(),
-                        *has_working_dir_changes,
+                        &repo.commits,
+                        repo.selected_commit.as_ref(),
+                        !repo.working_dir_files.is_empty(),
                     );
                     if let Some(msg) = panes::commit_history::action_to_message(action) {
                         self.messages.push(msg);
                     }
                 }
                 panes::Pane::ChangedFiles => {
-                    if let Some(files) = changed_files {
+                    if let Some(files) = &repo.changed_files {
                         let action = panes::changed_files::render(ui, files);
                         if let Some(msg) = panes::changed_files::action_to_message(action) {
                             self.messages.push(msg);
@@ -373,7 +452,17 @@ impl<'a> egui_dock::TabViewer for PaneViewer<'a> {
                     }
                 }
                 panes::Pane::DiffViewer => {
-                    panes::diff_viewer::render(ui, file_view);
+                    panes::diff_viewer::render(ui, &repo.file_view);
+                }
+                panes::Pane::Branches => {
+                    if let Some(branch_tree) = &repo.branch_tree {
+                        let action = panes::branches::render(ui, branch_tree);
+                        if let Some(msg) = panes::branches::action_to_message(action) {
+                            self.messages.push(msg);
+                        }
+                    } else {
+                        ui.label("Loading branches...");
+                    }
                 }
             }
         });
@@ -392,13 +481,23 @@ impl eframe::App for CrabOnTreeApp {
         // Request continuous repaints for message polling
         ctx.request_repaint_after(std::time::Duration::from_millis(100));
 
+        // Collect visible panes from dock state
+        let visible_panes = self.get_visible_panes();
+
         // Render top panel
         let top_action = components::top_panel::render(
             ctx,
             self.state.current_repo.is_some(),
             self.state.loading,
+            &visible_panes,
         );
-        if let Some(msg) = components::top_panel::action_to_message(top_action) {
+
+        // Handle pane toggle separately
+        if let components::top_panel::TopPanelAction::TogglePane(pane) = &top_action {
+            self.toggle_pane(*pane);
+        }
+
+        if let Some(msg) = components::top_panel::action_to_message(&top_action) {
             self.handle_message(msg);
         }
 
@@ -412,6 +511,30 @@ impl eframe::App for CrabOnTreeApp {
         // Render help dialog if requested
         if self.show_shortcuts_help {
             components::shortcuts_help::render(ctx, &mut self.show_shortcuts_help);
+        }
+
+        // Render checkout changes dialog if needed
+        if let Some(dialog) = &self.state.checkout_changes_dialog {
+            let action = components::checkout_changes_dialog::render(ctx, dialog);
+            if let Some(msg) = components::checkout_changes_dialog::action_to_message(action.clone(), dialog) {
+                self.handle_message(msg);
+            }
+            // Handle cancel action (close dialog)
+            if matches!(action, components::checkout_changes_dialog::CheckoutChangesAction::Cancel) {
+                self.state.checkout_changes_dialog = None;
+            }
+        }
+
+        // Render branch conflict dialog if needed
+        if let Some(dialog) = &mut self.state.branch_conflict_dialog {
+            let action = components::branch_conflict_dialog::render(ctx, dialog);
+            if let Some(msg) = components::branch_conflict_dialog::action_to_message(action.clone(), dialog) {
+                self.handle_message(msg);
+            }
+            // Handle cancel action (close dialog)
+            if matches!(action, components::branch_conflict_dialog::BranchConflictAction::Cancel) {
+                self.state.branch_conflict_dialog = None;
+            }
         }
 
         egui::CentralPanel::default()

@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 use crabontree_git::{Commit, DiffHunk, FileDiff, StatusSummary, WorkingDirFile};
-use crate::state::{BranchTreeState, ChangedFilesState, DiffViewMode, FileTreeState};
+use crate::state::{BranchTreeState, ChangedFilesState, DiffViewMode};
 
 /// Messages that drive application state changes.
 #[derive(Debug, Clone)]
@@ -112,23 +112,50 @@ pub enum AppMessage {
     /// User toggled a branch tree section (expand/collapse).
     BranchSectionToggled(String),
 
-    /// User requested to checkout a branch.
-    BranchCheckoutRequested(String),
+    /// User selected a branch (single-click or keyboard navigation).
+    BranchSelected { name: String, is_remote: bool },
+
+    /// User requested to checkout a branch (double-click or Enter).
+    BranchCheckoutRequested { name: String, is_remote: bool },
+
+    /// Show dialog for handling uncommitted changes before checkout.
+    ShowCheckoutWithChangesDialog {
+        branch_name: String,
+        is_remote: bool,
+    },
+
+    /// User chose to stash changes and checkout.
+    CheckoutWithStash { branch_name: String, is_remote: bool },
+
+    /// User chose to discard changes and checkout.
+    CheckoutWithDiscard { branch_name: String, is_remote: bool },
+
+    /// Show dialog for remote branch name conflict.
+    ShowRemoteBranchConflictDialog {
+        remote_branch: String,
+        local_name: String,
+    },
+
+    /// User chose to override existing local branch.
+    CheckoutRemoteOverride {
+        remote_branch: String,
+        local_name: String,
+    },
+
+    /// User chose to rename local branch for remote checkout.
+    CheckoutRemoteRename {
+        remote_branch: String,
+        new_local_name: String,
+    },
 
     /// Branch was checked out successfully.
     BranchCheckedOut(String),
 
-    /// User requested to load file tree.
-    LoadFileTreeRequested,
+    /// Changes were stashed successfully.
+    ChangesStashed { stash_name: String },
 
-    /// File tree was loaded.
-    FileTreeLoaded(FileTreeState),
-
-    /// User toggled a file tree node (expand/collapse).
-    FileTreeNodeToggled(PathBuf),
-
-    /// User selected a file tree node.
-    FileTreeNodeSelected(PathBuf),
+    /// Changes were discarded successfully.
+    ChangesDiscarded,
 
     /// User requested to load changed files.
     LoadChangedFilesRequested,
@@ -167,6 +194,4 @@ pub enum AppMessage {
     /// User changed diff view mode.
     DiffViewModeChanged(DiffViewMode),
 
-    /// Pane widths were updated.
-    PaneWidthsUpdated([f32; 3]),
 }
