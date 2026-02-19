@@ -648,12 +648,36 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
 
                     // Load diffs for all selected files
                     if files.selected_files.len() > 1 {
-                        state.loading = true;
-                        let selected_paths: Vec<_> = files.selected_files.iter().cloned().collect();
-                        return Effect::LoadMultipleFileDiffs {
-                            repo_path: repo.path.clone(),
-                            file_paths: selected_paths,
-                        };
+                        let is_viewing_commit = repo.selected_commit.as_ref()
+                            .map(|hash| hash != crate::WORKING_DIR_HASH)
+                            .unwrap_or(false);
+
+                        if is_viewing_commit {
+                            // For commits, build MultipleDiffs from the already-loaded commit_diff
+                            if let Some(commit_diff) = &repo.commit_diff {
+                                let selected: std::collections::HashSet<_> =
+                                    files.selected_files.iter().collect();
+                                let multi: Vec<_> = commit_diff.iter()
+                                    .filter(|fd| {
+                                        let p = std::path::PathBuf::from(&fd.path);
+                                        selected.contains(&p)
+                                    })
+                                    .map(|fd| (std::path::PathBuf::from(&fd.path), fd.hunks.clone()))
+                                    .collect();
+                                repo.file_view = crate::state::FileViewState::MultipleDiffs {
+                                    files: multi,
+                                    view_mode: crate::state::DiffViewMode::Unified,
+                                };
+                            }
+                            return Effect::None;
+                        } else {
+                            state.loading = true;
+                            let selected_paths: Vec<_> = files.selected_files.iter().cloned().collect();
+                            return Effect::LoadMultipleFileDiffs {
+                                repo_path: repo.path.clone(),
+                                file_paths: selected_paths,
+                            };
+                        }
                     }
                 }
             }

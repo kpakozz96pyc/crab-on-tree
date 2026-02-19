@@ -24,8 +24,6 @@ pub fn render(ui: &mut egui::Ui, state: &FileViewState) {
                 });
             } else {
                 for (path, hunks) in files {
-                    ui.heading(path.display().to_string());
-                    ui.add_space(5.0);
                     DiffView::new(path, hunks).render(ui);
                     ui.add_space(20.0);
                     ui.separator();
