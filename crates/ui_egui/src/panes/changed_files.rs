@@ -220,14 +220,16 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
         ui.add_space(5.0);
 
         // Checkboxes (left column) and Commit button (right side)
+        // Declare outside closures so the button can read the up-to-date toggled values
+        // even when the checkbox and the button are both interacted with in the same frame.
+        let mut amend = files.amend_last_commit;
+        let mut push = files.push_after_commit;
+
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
-                let mut amend = files.amend_last_commit;
                 if ui.checkbox(&mut amend, "Amend last commit").changed() {
                     action = ChangedFilesAction::AmendLastCommitToggled(amend);
                 }
-
-                let mut push = files.push_after_commit;
                 if ui.checkbox(&mut push, "Push after commit").changed() {
                     action = ChangedFilesAction::PushAfterCommitToggled(push);
                 }
@@ -239,8 +241,8 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                     action = ChangedFilesAction::CommitChangesRequested {
                         summary: files.commit_summary.clone(),
                         description: files.commit_description.clone(),
-                        amend: files.amend_last_commit,
-                        push: files.push_after_commit,
+                        amend,
+                        push,
                     };
                 }
             });
