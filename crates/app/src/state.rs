@@ -24,6 +24,7 @@ pub struct BranchConflictDialog {
 pub struct AppState {
     pub current_repo: Option<RepoState>,
     pub loading: bool,
+    pub committing: bool,
     pub error: Option<String>,
     pub config: super::AppConfig,
     pub staging_progress: Option<StagingProgress>,
@@ -36,6 +37,7 @@ impl Default for AppState {
         Self {
             current_repo: None,
             loading: false,
+            committing: false,
             error: None,
             config: super::AppConfig::default(),
             staging_progress: None,

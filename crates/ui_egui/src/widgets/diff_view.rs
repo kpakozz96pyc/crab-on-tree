@@ -27,6 +27,14 @@ impl<'a> DiffView<'a> {
         ui.separator();
         ui.add_space(5.0);
 
+        if self.hunks.is_empty() {
+            ui.vertical_centered(|ui| {
+                ui.add_space(40.0);
+                ui.label(egui::RichText::new("Can't display diff").weak());
+            });
+            return;
+        }
+
         for (hunk_idx, hunk) in self.hunks.iter().enumerate() {
             ui.push_id(format!("hunk_{}", hunk_idx), |ui| {
                 self.render_hunk(ui, hunk);

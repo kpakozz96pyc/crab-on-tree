@@ -108,6 +108,7 @@ impl CrabOnTreeApp {
         let state = AppState {
             current_repo: None,
             loading: false,
+            committing: false,
             error: None,
             config,
             staging_progress: None,
@@ -395,6 +396,7 @@ impl CrabOnTreeApp {
             repo_data,
             messages: &mut messages,
             loading: self.state.loading,
+            committing: self.state.committing,
         };
 
         DockArea::new(&mut self.dock_state)
@@ -412,6 +414,7 @@ struct PaneViewer<'a> {
     repo_data: &'a crabontree_app::RepoState,
     messages: &'a mut Vec<crabontree_app::AppMessage>,
     loading: bool,
+    committing: bool,
 }
 
 impl<'a> egui_dock::TabViewer for PaneViewer<'a> {
@@ -452,7 +455,7 @@ impl<'a> egui_dock::TabViewer for PaneViewer<'a> {
                 }
                 panes::Pane::ChangedFiles => {
                     if let Some(files) = &repo.changed_files {
-                        let action = panes::changed_files::render(ui, files, self.loading);
+                        let action = panes::changed_files::render(ui, files, self.committing);
                         if let Some(msg) = panes::changed_files::action_to_message(action) {
                             self.messages.push(msg);
                         }

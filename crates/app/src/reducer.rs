@@ -59,6 +59,7 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
 
         AppMessage::Error(err) => {
             state.loading = false;
+            state.committing = false;
             state.error = Some(err);
             Effect::None
         }
@@ -294,6 +295,7 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
 
         AppMessage::CommitCreated { hash, message: _ } => {
             state.loading = false;
+            state.committing = false;
             if let Some(repo) = &mut state.current_repo {
                 // Clear commit message
                 repo.commit_message.clear();
@@ -821,6 +823,7 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
         AppMessage::CommitChangesRequested { summary, description, amend, push } => {
             if let Some(repo) = &state.current_repo {
                 state.loading = true;
+                state.committing = true;
                 let full_message = if description.is_empty() {
                     summary.clone()
                 } else {

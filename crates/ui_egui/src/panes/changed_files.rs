@@ -190,7 +190,10 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
         let summary_response = ui.add(
             egui::TextEdit::singleline(&mut summary)
                 .desired_width(f32::INFINITY)
-                .hint_text("Commit summary")
+                .hint_text(
+                    egui::RichText::new("Commit summary")
+                        .color(egui::Color32::from_gray(80))
+                )
         );
         if summary_response.changed() {
             action = ChangedFilesAction::CommitSummaryUpdated(summary);
@@ -205,7 +208,10 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
             egui::TextEdit::multiline(&mut description)
                 .desired_width(f32::INFINITY)
                 .desired_rows(3)
-                .hint_text("Optional description")
+                .hint_text(
+                    egui::RichText::new("Optional description")
+                        .color(egui::Color32::from_gray(80))
+                )
         );
         if description_response.changed() {
             action = ChangedFilesAction::CommitDescriptionUpdated(description);

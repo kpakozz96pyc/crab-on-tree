@@ -26,6 +26,14 @@ impl<'a> FileContentView<'a> {
         ui.separator();
         ui.add_space(5.0);
 
+        if self.content.is_empty() {
+            ui.vertical_centered(|ui| {
+                ui.add_space(40.0);
+                ui.label(egui::RichText::new("Can't display content").weak());
+            });
+            return;
+        }
+
         for (i, line) in self.content.lines().enumerate() {
             ui.push_id(format!("content_line_{}", i), |ui| {
                 ui.horizontal(|ui| {

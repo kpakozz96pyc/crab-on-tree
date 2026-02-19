@@ -32,7 +32,7 @@ pub fn render(ui: &mut egui::Ui, state: &FileViewState) {
                 ui.heading(path.display().to_string());
                 ui.add_space(20.0);
                 ui.label(format!("Binary file ({} bytes)", size));
-                ui.label("Cannot display binary content");
+                ui.label(egui::RichText::new("Can't display binary").weak());
             });
         }
     }

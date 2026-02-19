@@ -1,7 +1,17 @@
 //! Application configuration management.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
+
+/// Saved commit message draft for a repository (summary + description).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CommitDraft {
+    #[serde(default)]
+    pub summary: String,
+    #[serde(default)]
+    pub description: String,
+}
 
 /// Application configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,6 +31,10 @@ pub struct AppConfig {
     /// JSON-serialized dock layout state
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub dock_layout: Option<String>,
+
+    /// Saved commit message drafts keyed by repository path string.
+    #[serde(default)]
+    pub commit_drafts: HashMap<String, CommitDraft>,
 }
 
 fn default_theme() -> String {
@@ -43,6 +57,7 @@ impl Default for AppConfig {
             max_recent: default_max_recent(),
             pane_widths: default_pane_widths(),
             dock_layout: None,
+            commit_drafts: HashMap::new(),
         }
     }
 }
