@@ -307,11 +307,16 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
                 // Clear commit message
                 repo.commit_message.clear();
 
+                // Clear the diff viewer
+                repo.file_view = crate::state::FileViewState::None;
+
                 // Clear commit panel fields
                 if let Some(changed_files) = &mut repo.changed_files {
                     changed_files.commit_summary.clear();
                     changed_files.commit_description.clear();
                     changed_files.amend_last_commit = false;
+                    changed_files.selected_file = None;
+                    changed_files.selected_files.clear();
                 }
 
                 // Clear the saved draft for this repo
