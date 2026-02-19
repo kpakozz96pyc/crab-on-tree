@@ -307,11 +307,15 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
                     changed_files.amend_last_commit = false;
                 }
 
-                // Show success message temporarily
+                // Clear the saved draft for this repo
+                let repo_key = repo.path.to_string_lossy().to_string();
+                state.config.commit_drafts.remove(&repo_key);
+
                 tracing::info!("Commit created: {}", hash);
 
                 // Refresh repo data, working directory, and changed files
                 Effect::Batch(vec![
+                    Effect::SaveConfig,
                     Effect::LoadCommitHistory(repo.path.clone()),
                     Effect::LoadWorkingDirStatus(repo.path.clone()),
                     Effect::LoadChangedFiles(repo.path.clone()),
@@ -520,12 +524,19 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
         AppMessage::ChangedFilesLoaded(mut changed_files) => {
             state.loading = false;
             if let Some(repo) = &mut state.current_repo {
-                // Preserve commit panel fields from previous state
                 if let Some(old_files) = &repo.changed_files {
+                    // Preserve commit panel fields from previous in-memory state
                     changed_files.commit_summary = old_files.commit_summary.clone();
                     changed_files.commit_description = old_files.commit_description.clone();
                     changed_files.amend_last_commit = old_files.amend_last_commit;
                     changed_files.push_after_commit = old_files.push_after_commit;
+                } else if !changed_files.is_commit_view {
+                    // First load of working directory view — restore saved draft from config
+                    let repo_key = repo.path.to_string_lossy().to_string();
+                    if let Some(draft) = state.config.commit_drafts.get(&repo_key) {
+                        changed_files.commit_summary = draft.summary.clone();
+                        changed_files.commit_description = draft.description.clone();
+                    }
                 }
                 repo.changed_files = Some(changed_files);
                 tracing::info!("Loaded changed files");

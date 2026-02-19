@@ -567,6 +567,28 @@ impl eframe::App for CrabOnTreeApp {
 
 impl Drop for CrabOnTreeApp {
     fn drop(&mut self) {
+        // Persist the current working-directory commit draft to config
+        if let Some(repo) = &self.state.current_repo {
+            if let Some(changed_files) = &repo.changed_files {
+                if !changed_files.is_commit_view {
+                    let repo_key = repo.path.to_string_lossy().to_string();
+                    if changed_files.commit_summary.is_empty()
+                        && changed_files.commit_description.is_empty()
+                    {
+                        self.state.config.commit_drafts.remove(&repo_key);
+                    } else {
+                        self.state.config.commit_drafts.insert(
+                            repo_key,
+                            crabontree_app::CommitDraft {
+                                summary: changed_files.commit_summary.clone(),
+                                description: changed_files.commit_description.clone(),
+                            },
+                        );
+                    }
+                }
+            }
+        }
+
         // Save dock layout to config
         match serde_json::to_string(&self.dock_state) {
             Ok(layout_json) => {

@@ -7,7 +7,7 @@ pub fn render(ui: &mut egui::Ui, state: &FileViewState) {
         FileViewState::None => {
             ui.vertical_centered(|ui| {
                 ui.add_space(100.0);
-                ui.label("Select a file or commit to view");
+                ui.label(egui::RichText::new("Nothing to show").weak());
             });
         }
         FileViewState::Content { path, content, .. } => {
@@ -17,13 +17,20 @@ pub fn render(ui: &mut egui::Ui, state: &FileViewState) {
             DiffView::new(path, hunks).render(ui);
         }
         FileViewState::MultipleDiffs { files, .. } => {
-            for (path, hunks) in files {
-                ui.heading(path.display().to_string());
-                ui.add_space(5.0);
-                DiffView::new(path, hunks).render(ui);
-                ui.add_space(20.0);
-                ui.separator();
-                ui.add_space(20.0);
+            if files.is_empty() {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(100.0);
+                    ui.label(egui::RichText::new("Nothing to show").weak());
+                });
+            } else {
+                for (path, hunks) in files {
+                    ui.heading(path.display().to_string());
+                    ui.add_space(5.0);
+                    DiffView::new(path, hunks).render(ui);
+                    ui.add_space(20.0);
+                    ui.separator();
+                    ui.add_space(20.0);
+                }
             }
         }
         FileViewState::Binary { path, size } => {
