@@ -334,7 +334,7 @@ async fn execute_create_commit(
     .context("Task panicked")??;
 
     // Push to remote if requested
-    if push {
+    let push_error = if push {
         let push_result = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
             let repo = GitRepository::open(&repo_path_clone)
                 .with_context(|| format!("Failed to open repository at {}", repo_path_clone.display()))?;
@@ -345,15 +345,21 @@ async fn execute_create_commit(
         .await
         .context("Task panicked")?;
 
-        // Log push errors but don't fail the commit
-        if let Err(e) = push_result {
-            tracing::warn!("Push failed after commit: {}", e);
+        match push_result {
+            Ok(_) => None,
+            Err(e) => {
+                tracing::warn!("Push failed after commit: {}", e);
+                Some(format!("{:#}", e))
+            }
         }
-    }
+    } else {
+        None
+    };
 
     Ok(AppMessage::CommitCreated {
         hash: commit_hash,
         message,
+        push_error,
     })
 }
 

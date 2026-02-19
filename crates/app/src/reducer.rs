@@ -294,9 +294,15 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
             }
         }
 
-        AppMessage::CommitCreated { hash, message: _ } => {
+        AppMessage::CommitCreated { hash, message: _, push_error } => {
             state.loading = false;
             state.committing = false;
+
+            // Surface push failure so the user can see it
+            if let Some(err) = push_error {
+                state.error = Some(format!("Commit created but push failed: {}", err));
+            }
+
             if let Some(repo) = &mut state.current_repo {
                 // Clear commit message
                 repo.commit_message.clear();

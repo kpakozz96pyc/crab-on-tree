@@ -93,6 +93,8 @@ pub enum AppMessage {
     CommitCreated {
         hash: String,
         message: String,
+        /// Set when push was requested but failed (commit itself succeeded).
+        push_error: Option<String>,
     },
 
     /// Author identity was loaded.
