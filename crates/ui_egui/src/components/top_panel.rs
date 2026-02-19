@@ -2,7 +2,6 @@
 ///
 /// Displays the application name, repository controls (Open, Refresh, Close),
 /// and a loading spinner when operations are in progress.
-
 use crabontree_app::AppMessage;
 use eframe::egui;
 use std::path::PathBuf;
@@ -16,7 +15,7 @@ pub enum TopPanelAction {
     TogglePane(crate::panes::Pane),
 }
 
-/// Renders the top panel toolbar.
+/// Renders the top panel toolbar. dfdad
 ///
 /// Returns an action that the caller should handle.
 pub fn render(
@@ -56,21 +55,33 @@ pub fn render(
 
                 // CommitHistory toggle
                 let commit_visible = visible_panes.contains(&crate::panes::Pane::CommitHistory);
-                let commit_text = if commit_visible { "★ History" } else { "☆ History" };
+                let commit_text = if commit_visible {
+                    "★ History"
+                } else {
+                    "☆ History"
+                };
                 if ui.button(commit_text).clicked() {
                     action = TopPanelAction::TogglePane(crate::panes::Pane::CommitHistory);
                 }
 
                 // Branches toggle
                 let branches_visible = visible_panes.contains(&crate::panes::Pane::Branches);
-                let branches_text = if branches_visible { "★ Branches" } else { "☆ Branches" };
+                let branches_text = if branches_visible {
+                    "★ Branches"
+                } else {
+                    "☆ Branches"
+                };
                 if ui.button(branches_text).clicked() {
                     action = TopPanelAction::TogglePane(crate::panes::Pane::Branches);
                 }
 
                 // ChangedFiles toggle
                 let files_visible = visible_panes.contains(&crate::panes::Pane::ChangedFiles);
-                let files_text = if files_visible { "★ Files" } else { "☆ Files" };
+                let files_text = if files_visible {
+                    "★ Files"
+                } else {
+                    "☆ Files"
+                };
                 if ui.button(files_text).clicked() {
                     action = TopPanelAction::TogglePane(crate::panes::Pane::ChangedFiles);
                 }
