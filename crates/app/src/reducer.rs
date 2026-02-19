@@ -91,7 +91,8 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
         AppMessage::CommitSelected(hash) => {
             if let Some(repo) = &mut state.current_repo {
                 repo.selected_commit = Some(hash.clone());
-                repo.commit_diff = None; // Clear previous diff
+                repo.commit_diff = None;
+                repo.file_view = crate::state::FileViewState::None;
 
                 // Check if selecting working directory or a real commit
                 if hash == crate::WORKING_DIR_HASH {
