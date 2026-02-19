@@ -778,9 +778,33 @@ impl GitRepository {
             let mut remote = self.git2_repo.find_remote("origin")
                 .map_err(|e| GitError::OperationFailed(format!("Failed to find remote 'origin': {}", e)))?;
 
+            // Set up credential callbacks so libgit2 can authenticate.
+            // The git CLI handles this automatically, but libgit2 requires explicit callbacks.
+            let mut callbacks = git2::RemoteCallbacks::new();
+            let mut tried_ssh_agent = false;
+            callbacks.credentials(move |url, username_from_url, allowed_types| {
+                if allowed_types.contains(git2::CredentialType::SSH_KEY) && !tried_ssh_agent {
+                    tried_ssh_agent = true;
+                    let username = username_from_url.unwrap_or("git");
+                    return git2::Cred::ssh_key_from_agent(username);
+                }
+                if allowed_types.contains(git2::CredentialType::USER_PASS_PLAINTEXT) {
+                    if let Ok(config) = git2::Config::open_default() {
+                        return git2::Cred::credential_helper(&config, url, username_from_url);
+                    }
+                }
+                if allowed_types.contains(git2::CredentialType::DEFAULT) {
+                    return git2::Cred::default();
+                }
+                Err(git2::Error::from_str("no supported authentication methods"))
+            });
+
+            let mut push_options = git2::PushOptions::new();
+            push_options.remote_callbacks(callbacks);
+
             // Push to remote
             let refspec = format!("refs/heads/{}:refs/heads/{}", branch_name, branch_name);
-            remote.push(&[&refspec], None)
+            remote.push(&[&refspec], Some(&mut push_options))
                 .map_err(|e| GitError::OperationFailed(format!("Failed to push: {}", e)))?;
 
             tracing::info!("Pushed {} to origin", branch_name);
