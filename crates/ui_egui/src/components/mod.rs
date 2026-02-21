@@ -1,4 +1,4 @@
-/// UI components for the application
+//! UI components for the application.
 
 pub mod branch_conflict_dialog;
 pub mod checkout_changes_dialog;

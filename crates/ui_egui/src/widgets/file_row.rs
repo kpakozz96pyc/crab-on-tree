@@ -1,8 +1,8 @@
-/// File row widget for displaying files with status icons.
-///
-/// This widget displays a file path with a colored status indicator,
-/// eliminating the duplication of status icon logic across multiple
-/// sections (staged, unstaged, untracked, conflicted).
+//! File row widget for displaying files with status icons.
+//!
+//! This widget displays a file path with a colored status indicator,
+//! eliminating the duplication of status icon logic across multiple
+//! sections (staged, unstaged, untracked, conflicted).
 
 use crabontree_app::WorkingDirStatus;
 use eframe::egui;
@@ -12,10 +12,7 @@ use std::path::Path;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileRowInteraction {
     None,
-    SingleClick {
-        ctrl: bool,
-        shift: bool,
-    },
+    SingleClick { ctrl: bool, shift: bool },
     DoubleClick,
 }
 
@@ -43,15 +40,13 @@ impl<'a> FileRow<'a> {
     pub fn render(self, ui: &mut egui::Ui) -> FileRowInteraction {
         let (status_icon, status_color) = self.get_status_info();
 
-        let response = ui.horizontal(|ui| {
-            ui.set_min_width(ui.available_width());
-            ui.colored_label(
-                status_color,
-                egui::RichText::new(status_icon).strong(),
-            );
-            ui.selectable_label(self.is_selected, self.path.display().to_string())
-        })
-        .inner;
+        let response = ui
+            .horizontal(|ui| {
+                ui.set_min_width(ui.available_width());
+                ui.colored_label(status_color, egui::RichText::new(status_icon).strong());
+                ui.selectable_label(self.is_selected, self.path.display().to_string())
+            })
+            .inner;
 
         if response.double_clicked() {
             FileRowInteraction::DoubleClick

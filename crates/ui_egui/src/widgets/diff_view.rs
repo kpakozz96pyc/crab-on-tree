@@ -1,7 +1,7 @@
-/// Diff view widget for rendering diff hunks.
-///
-/// This widget handles the display of git diffs with proper syntax
-/// highlighting for additions, deletions, and context lines.
+//! Diff view widget for rendering diff hunks.
+//!
+//! This widget handles the display of git diffs with proper syntax
+//! highlighting for additions, deletions, and context lines.
 
 use crabontree_app::{DiffHunk, DiffLineType};
 use eframe::egui;

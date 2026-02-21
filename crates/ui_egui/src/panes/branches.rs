@@ -95,10 +95,11 @@ fn render_remote_section(
                             ui.push_id(format!("remote_{}_{}", remote_name, idx), |ui| {
                                 // Create full remote branch name (remote/branch)
                                 let full_name = format!("{}/{}", remote_name, branch.name);
-                                let is_selected = selected_branch.as_ref().map(|s| s.as_str()) == Some(&full_name);
+                                let is_selected = selected_branch.as_ref().map(|s| s.as_str())
+                                    == Some(&full_name);
 
                                 let response = ui.horizontal(|ui| {
-                                    ui.label(" ");  // Space for alignment with local branches
+                                    ui.label(" "); // Space for alignment with local branches
                                     ui.label("🌿");
                                     ui.selectable_label(is_selected, &branch.name)
                                 });
@@ -153,8 +154,12 @@ pub fn render(ui: &mut egui::Ui, branch_tree: &BranchTreeState, loading: bool) -
         ui.label("👁");
         ui.label(format!(
             "Viewing {}",
-            branch_tree.local_branches.len() +
-            branch_tree.remote_branches.values().map(|v| v.len()).sum::<usize>()
+            branch_tree.local_branches.len()
+                + branch_tree
+                    .remote_branches
+                    .values()
+                    .map(|v| v.len())
+                    .sum::<usize>()
         ));
     });
 
@@ -187,18 +192,11 @@ pub fn render(ui: &mut egui::Ui, branch_tree: &BranchTreeState, loading: bool) -
         let painter = ui.painter();
 
         // Draw semi-transparent overlay
-        painter.rect_filled(
-            pane_rect,
-            0.0,
-            egui::Color32::from_black_alpha(128),
-        );
+        painter.rect_filled(pane_rect, 0.0, egui::Color32::from_black_alpha(128));
 
         // Draw spinner and text in the center
         let center = pane_rect.center();
-        let spinner_rect = egui::Rect::from_center_size(
-            center,
-            egui::vec2(150.0, 50.0),
-        );
+        let spinner_rect = egui::Rect::from_center_size(center, egui::vec2(150.0, 50.0));
 
         ui.allocate_ui_at_rect(spinner_rect, |ui| {
             ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
@@ -207,7 +205,7 @@ pub fn render(ui: &mut egui::Ui, branch_tree: &BranchTreeState, loading: bool) -
                 ui.label(
                     egui::RichText::new("Switching branch...")
                         .color(egui::Color32::WHITE)
-                        .strong()
+                        .strong(),
                 );
             });
         });

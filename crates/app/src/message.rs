@@ -1,8 +1,8 @@
 //! Application messages for state updates.
 
-use std::path::PathBuf;
-use crabontree_git::{Commit, DiffHunk, FileDiff, StatusSummary, WorkingDirFile};
 use crate::state::{BranchTreeState, ChangedFilesState, DiffViewMode};
+use crabontree_git::{Commit, DiffHunk, FileDiff, StatusSummary, WorkingDirFile};
+use std::path::PathBuf;
 
 /// Messages that drive application state changes.
 #[derive(Debug, Clone)]
@@ -98,13 +98,9 @@ pub enum AppMessage {
     },
 
     /// Author identity was loaded.
-    AuthorIdentityLoaded {
-        name: String,
-        email: String,
-    },
+    AuthorIdentityLoaded { name: String, email: String },
 
     // ===== 4-Pane Layout Messages =====
-
     /// User requested to load branch tree.
     LoadBranchTreeRequested,
 
@@ -127,10 +123,16 @@ pub enum AppMessage {
     },
 
     /// User chose to stash changes and checkout.
-    CheckoutWithStash { branch_name: String, is_remote: bool },
+    CheckoutWithStash {
+        branch_name: String,
+        is_remote: bool,
+    },
 
     /// User chose to discard changes and checkout.
-    CheckoutWithDiscard { branch_name: String, is_remote: bool },
+    CheckoutWithDiscard {
+        branch_name: String,
+        is_remote: bool,
+    },
 
     /// Show dialog for remote branch name conflict.
     ShowRemoteBranchConflictDialog {
@@ -195,10 +197,7 @@ pub enum AppMessage {
     FileDiffRequested(PathBuf),
 
     /// File diff was loaded.
-    FileDiffLoaded {
-        path: PathBuf,
-        hunks: Vec<DiffHunk>,
-    },
+    FileDiffLoaded { path: PathBuf, hunks: Vec<DiffHunk> },
 
     /// Multiple file diffs were loaded.
     MultipleFileDiffsLoaded {
@@ -206,10 +205,7 @@ pub enum AppMessage {
     },
 
     /// Binary file was detected.
-    BinaryFileDetected {
-        path: PathBuf,
-        size: u64,
-    },
+    BinaryFileDetected { path: PathBuf, size: u64 },
 
     /// User changed diff view mode.
     DiffViewModeChanged(DiffViewMode),
@@ -233,5 +229,4 @@ pub enum AppMessage {
         amend: bool,
         push: bool,
     },
-
 }

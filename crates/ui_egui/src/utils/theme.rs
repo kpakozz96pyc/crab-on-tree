@@ -1,4 +1,4 @@
-/// Theme utilities for applying color themes to the application.
+//! Theme utilities for applying color themes to the application.
 
 use crabontree_ui_core::{Color, Theme};
 use eframe::egui;

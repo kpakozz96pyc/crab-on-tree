@@ -9,6 +9,6 @@ pub mod repo;
 
 pub use error::GitError;
 pub use repo::{
-    Commit, DiffHunk, DiffLine, DiffLineType, FileDiff, FileStatus, GitRepository, StatusSummary,
-    WorkingDirFile, WorkingDirStatus,
+    Commit, DiffHunk, DiffLine, DiffLineType, FileDiff, FileStatus, GitRepository, LocalBranch,
+    RemoteBranch, StatusSummary, Tag, WorkingDirFile, WorkingDirStatus,
 };

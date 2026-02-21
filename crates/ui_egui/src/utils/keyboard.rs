@@ -1,6 +1,6 @@
-/// Keyboard handling utilities for the application.
-///
-/// Handles pane navigation, shortcuts, and keyboard events.
+//! Keyboard handling utilities for the application.
+//!
+//! Handles pane navigation, shortcuts, and keyboard events.
 
 use crabontree_app::AppMessage;
 use eframe::egui;
@@ -16,10 +16,7 @@ pub enum KeyboardAction {
 /// Handles keyboard shortcuts and returns an action.
 ///
 /// Returns both a keyboard action and the new active pane state.
-pub fn handle_shortcuts(
-    ui: &egui::Ui,
-    current_pane: usize,
-) -> (KeyboardAction, usize) {
+pub fn handle_shortcuts(ui: &egui::Ui, current_pane: usize) -> (KeyboardAction, usize) {
     let any_text_focused = ui.memory(|mem| mem.focused().is_some());
 
     if any_text_focused {
@@ -60,7 +57,8 @@ pub fn handle_shortcuts(
 
     // '?' to show help
     if ui.input(|i| {
-        i.key_pressed(egui::Key::Questionmark) || (i.key_pressed(egui::Key::Slash) && i.modifiers.shift)
+        i.key_pressed(egui::Key::Questionmark)
+            || (i.key_pressed(egui::Key::Slash) && i.modifiers.shift)
     }) {
         return (KeyboardAction::ToggleHelp, current_pane);
     }

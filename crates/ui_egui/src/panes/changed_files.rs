@@ -11,7 +11,10 @@ pub enum ChangedFilesAction {
         ctrl: bool,
         shift: bool,
     },
-    ToggleStage { path: PathBuf, is_staged: bool },
+    ToggleStage {
+        path: PathBuf,
+        is_staged: bool,
+    },
     StageSelectedFiles,
     UnstageSelectedFiles,
     CommitSummaryUpdated(String),
@@ -46,7 +49,8 @@ fn render_section(
             for (idx, file) in files.iter().enumerate() {
                 ui.push_id(format!("{}_{}", id, idx), |ui| {
                     let is_selected = selected_files.contains(&file.path);
-                    let interaction = FileRow::new(&file.path, &file.status, is_selected).render(ui);
+                    let interaction =
+                        FileRow::new(&file.path, &file.status, is_selected).render(ui);
 
                     match interaction {
                         FileRowInteraction::SingleClick { ctrl, shift } => {
@@ -80,7 +84,10 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
     let mut action = ChangedFilesAction::None;
 
     // Handle Enter key for staging/unstaging selected files
-    if !files.is_commit_view && ui.input(|i| i.key_pressed(egui::Key::Enter)) && !files.selected_files.is_empty() {
+    if !files.is_commit_view
+        && ui.input(|i| i.key_pressed(egui::Key::Enter))
+        && !files.selected_files.is_empty()
+    {
         // Determine if we should stage or unstage based on where the files are
         let has_unstaged = files.selected_files.iter().any(|path| {
             files.unstaged.iter().any(|f| &f.path == path)
@@ -94,85 +101,131 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
         }
     }
 
-    // Render commit message section if available (for commit view)
-    if files.is_commit_view && !files.commit_message.is_empty() {
-        egui::CollapsingHeader::new("Commit Message")
-            .id_source("changed_files_commit_message")
-            .default_open(true)
+    if files.is_commit_view {
+        // Commit view: show commit message header then scrollable file list
+        if !files.commit_message.is_empty() {
+            egui::CollapsingHeader::new("Commit Message")
+                .id_source("changed_files_commit_message")
+                .default_open(true)
+                .show(ui, |ui| {
+                    egui::ScrollArea::vertical()
+                        .max_height(200.0)
+                        .show(ui, |ui| {
+                            ui.add(
+                                egui::TextEdit::multiline(&mut files.commit_message.as_str())
+                                    .desired_width(f32::INFINITY)
+                                    .interactive(false)
+                                    .font(egui::TextStyle::Monospace),
+                            );
+                        });
+                });
+            ui.add_space(5.0);
+        }
+
+        egui::ScrollArea::vertical()
+            .id_source("changed_files_scroll")
             .show(ui, |ui| {
-                egui::ScrollArea::vertical()
-                    .max_height(200.0)
-                    .show(ui, |ui| {
-                        ui.add(
-                            egui::TextEdit::multiline(&mut files.commit_message.as_str())
-                                .desired_width(f32::INFINITY)
-                                .interactive(false)
-                                .font(egui::TextStyle::Monospace)
-                        );
-                    });
+                render_section(
+                    ui,
+                    "changed_files_staged",
+                    "Staged",
+                    &files.staged,
+                    &files.selected_files,
+                    true,
+                    &mut action,
+                );
+                render_section(
+                    ui,
+                    "changed_files_unstaged",
+                    "Unstaged",
+                    &files.unstaged,
+                    &files.selected_files,
+                    true,
+                    &mut action,
+                );
+                render_section(
+                    ui,
+                    "changed_files_untracked",
+                    "Untracked",
+                    &files.untracked,
+                    &files.selected_files,
+                    true,
+                    &mut action,
+                );
+                render_section(
+                    ui,
+                    "changed_files_conflicted",
+                    "Conflicted",
+                    &files.conflicted,
+                    &files.selected_files,
+                    true,
+                    &mut action,
+                );
             });
-        ui.add_space(5.0);
-    }
+    } else {
+        // Working directory view: file list limited to available height minus commit panel,
+        // then the commit panel pinned at the bottom.
+        let commit_panel_height = 200.0;
+        let list_height = (ui.available_height() - commit_panel_height).max(0.0);
 
-    if !files.staged.is_empty() {
-        render_section(
-            ui,
-            "changed_files_staged",
-            "Staged",
-            &files.staged,
-            &files.selected_files,
-            files.is_commit_view,
-            &mut action,
-        );
-        ui.add_space(5.0);
-    }
+        egui::ScrollArea::vertical()
+            .id_source("changed_files_scroll")
+            .max_height(list_height)
+            .show(ui, |ui| {
+                if !files.staged.is_empty() {
+                    render_section(
+                        ui,
+                        "changed_files_staged",
+                        "Staged",
+                        &files.staged,
+                        &files.selected_files,
+                        false,
+                        &mut action,
+                    );
+                    ui.add_space(5.0);
+                }
 
-    if !files.unstaged.is_empty() {
-        render_section(
-            ui,
-            "changed_files_unstaged",
-            "Unstaged",
-            &files.unstaged,
-            &files.selected_files,
-            files.is_commit_view,
-            &mut action,
-        );
-        ui.add_space(5.0);
-    }
+                if !files.unstaged.is_empty() {
+                    render_section(
+                        ui,
+                        "changed_files_unstaged",
+                        "Unstaged",
+                        &files.unstaged,
+                        &files.selected_files,
+                        false,
+                        &mut action,
+                    );
+                    ui.add_space(5.0);
+                }
 
-    if !files.untracked.is_empty() {
-        render_section(
-            ui,
-            "changed_files_untracked",
-            "Untracked",
-            &files.untracked,
-            &files.selected_files,
-            files.is_commit_view,
-            &mut action,
-        );
-        ui.add_space(5.0);
-    }
+                if !files.untracked.is_empty() {
+                    render_section(
+                        ui,
+                        "changed_files_untracked",
+                        "Untracked",
+                        &files.untracked,
+                        &files.selected_files,
+                        false,
+                        &mut action,
+                    );
+                    ui.add_space(5.0);
+                }
 
-    if !files.conflicted.is_empty() {
-        render_section(
-            ui,
-            "changed_files_conflicted",
-            "Conflicted",
-            &files.conflicted,
-            &files.selected_files,
-            files.is_commit_view,
-            &mut action,
-        );
-    }
-
-    // Render commit panel at the bottom in working directory view
-    if !files.is_commit_view {
-        // Add vertical spacing to push commit panel to bottom
-        ui.add_space(ui.available_height() - 200.0); // Reserve space for commit panel
+                if !files.conflicted.is_empty() {
+                    render_section(
+                        ui,
+                        "changed_files_conflicted",
+                        "Conflicted",
+                        &files.conflicted,
+                        &files.selected_files,
+                        false,
+                        &mut action,
+                    );
+                }
+            });
 
         ui.separator();
 
-        // Store commit area rect for overlay
         let commit_area_rect = ui.available_rect_before_wrap();
 
         let has_staged_files = !files.staged.is_empty();
@@ -191,9 +244,8 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
             egui::TextEdit::singleline(&mut summary)
                 .desired_width(f32::INFINITY)
                 .hint_text(
-                    egui::RichText::new("Commit summary")
-                        .color(egui::Color32::from_gray(80))
-                )
+                    egui::RichText::new("Commit summary").color(egui::Color32::from_gray(80)),
+                ),
         );
         if summary_response.changed() {
             action = ChangedFilesAction::CommitSummaryUpdated(summary);
@@ -209,9 +261,8 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                 .desired_width(f32::INFINITY)
                 .desired_rows(3)
                 .hint_text(
-                    egui::RichText::new("Optional description")
-                        .color(egui::Color32::from_gray(80))
-                )
+                    egui::RichText::new("Optional description").color(egui::Color32::from_gray(80)),
+                ),
         );
         if description_response.changed() {
             action = ChangedFilesAction::CommitDescriptionUpdated(description);
@@ -236,8 +287,12 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
             });
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let commit_enabled = has_staged_files && !files.commit_summary.is_empty() && !loading;
-                if ui.add_enabled(commit_enabled, egui::Button::new("Commit")).clicked() {
+                let commit_enabled =
+                    has_staged_files && !files.commit_summary.is_empty() && !loading;
+                if ui
+                    .add_enabled(commit_enabled, egui::Button::new("Commit"))
+                    .clicked()
+                {
                     action = ChangedFilesAction::CommitChangesRequested {
                         summary: files.commit_summary.clone(),
                         description: files.commit_description.clone(),
@@ -253,18 +308,11 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
             let painter = ui.painter();
 
             // Draw semi-transparent overlay
-            painter.rect_filled(
-                commit_area_rect,
-                0.0,
-                egui::Color32::from_black_alpha(128),
-            );
+            painter.rect_filled(commit_area_rect, 0.0, egui::Color32::from_black_alpha(128));
 
             // Draw spinner and text in the center
             let center = commit_area_rect.center();
-            let spinner_rect = egui::Rect::from_center_size(
-                center,
-                egui::vec2(100.0, 50.0),
-            );
+            let spinner_rect = egui::Rect::from_center_size(center, egui::vec2(100.0, 50.0));
 
             ui.allocate_ui_at_rect(spinner_rect, |ui| {
                 ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
@@ -273,7 +321,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                     ui.label(
                         egui::RichText::new("Committing...")
                             .color(egui::Color32::WHITE)
-                            .strong()
+                            .strong(),
                     );
                 });
             });
@@ -311,8 +359,16 @@ pub fn action_to_message(action: ChangedFilesAction) -> Option<AppMessage> {
         ChangedFilesAction::PushAfterCommitToggled(push) => {
             Some(AppMessage::PushAfterCommitToggled(push))
         }
-        ChangedFilesAction::CommitChangesRequested { summary, description, amend, push } => {
-            Some(AppMessage::CommitChangesRequested { summary, description, amend, push })
-        }
+        ChangedFilesAction::CommitChangesRequested {
+            summary,
+            description,
+            amend,
+            push,
+        } => Some(AppMessage::CommitChangesRequested {
+            summary,
+            description,
+            amend,
+            push,
+        }),
     }
 }

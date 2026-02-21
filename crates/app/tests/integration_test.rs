@@ -1,8 +1,6 @@
 //! Integration tests for the full application flow.
 
-use crabontree_app::{
-    reduce, AppMessage, AppState, Effect, Job, JobExecutor,
-};
+use crabontree_app::{reduce, AppMessage, AppState, Effect, Job, JobExecutor};
 use std::path::PathBuf;
 
 #[test]
@@ -122,12 +120,17 @@ fn test_refresh_repository_flow() {
     }
 
     // Wait for refresh to complete
-    let message = message_rx.blocking_recv().expect("Should receive refresh message");
+    let message = message_rx
+        .blocking_recv()
+        .expect("Should receive refresh message");
 
     let effect = reduce(&mut state, message);
 
     assert!(!state.loading, "Loading should be done after refresh");
-    assert!(state.current_repo.is_some(), "Repository should still be open");
+    assert!(
+        state.current_repo.is_some(),
+        "Repository should still be open"
+    );
     assert!(matches!(effect, Effect::None));
 
     println!("Repository refreshed successfully!");
@@ -141,7 +144,10 @@ fn test_open_invalid_repository() {
 
     let invalid_path = PathBuf::from("/nonexistent/invalid/path");
 
-    let effect = reduce(&mut state, AppMessage::OpenRepoRequested(invalid_path.clone()));
+    let effect = reduce(
+        &mut state,
+        AppMessage::OpenRepoRequested(invalid_path.clone()),
+    );
 
     assert!(state.loading);
 
@@ -168,7 +174,10 @@ fn test_open_invalid_repository() {
 
     assert!(!state.loading, "Loading should be done");
     assert!(state.error.is_some(), "Error should be set");
-    assert!(state.current_repo.is_none(), "Repository should not be open");
+    assert!(
+        state.current_repo.is_none(),
+        "Repository should not be open"
+    );
     assert!(matches!(effect, Effect::None));
 
     println!("Invalid repository correctly rejected!");
@@ -182,7 +191,9 @@ fn test_worker_thread_continues_after_error() {
     executor.submit(Job::OpenRepo(PathBuf::from("/invalid/path")));
 
     // Should receive error
-    let msg1 = message_rx.blocking_recv().expect("Should receive first message");
+    let msg1 = message_rx
+        .blocking_recv()
+        .expect("Should receive first message");
     assert!(matches!(msg1, AppMessage::Error(_)));
 
     // Submit a valid job - worker should still be running

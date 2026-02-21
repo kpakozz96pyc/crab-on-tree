@@ -1,4 +1,4 @@
-/// Dialog for handling remote branch name conflicts.
+//! Dialog for handling remote branch name conflicts.
 
 use crabontree_app::{AppMessage, BranchConflictDialog};
 use eframe::egui;
@@ -11,10 +11,7 @@ pub enum BranchConflictAction {
     Cancel,
 }
 
-pub fn render(
-    ctx: &egui::Context,
-    dialog: &mut BranchConflictDialog,
-) -> BranchConflictAction {
+pub fn render(ctx: &egui::Context, dialog: &mut BranchConflictDialog) -> BranchConflictAction {
     let mut action = BranchConflictAction::None;
 
     egui::Window::new("Branch Name Conflict")
@@ -50,10 +47,10 @@ pub fn render(
                 });
 
                 ui.horizontal(|ui| {
-                    if ui.button("Create with new name").clicked() {
-                        if !dialog.new_name_input.is_empty() {
-                            action = BranchConflictAction::Rename(dialog.new_name_input.clone());
-                        }
+                    if ui.button("Create with new name").clicked()
+                        && !dialog.new_name_input.is_empty()
+                    {
+                        action = BranchConflictAction::Rename(dialog.new_name_input.clone());
                     }
                 });
 

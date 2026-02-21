@@ -136,7 +136,11 @@ fn test_detached_head() {
     let repo = GitRepository::open(temp_dir.path()).unwrap();
     let head = repo.get_head().unwrap();
 
-    assert!(head.contains("detached"), "HEAD should be detached: {}", head);
+    assert!(
+        head.contains("detached"),
+        "HEAD should be detached: {}",
+        head
+    );
 }
 #[test]
 fn test_working_dir_status_clean() {
@@ -157,7 +161,10 @@ fn test_working_dir_status_untracked() {
     let status = repo.get_working_dir_status().unwrap();
     assert_eq!(status.len(), 1);
     assert_eq!(status[0].path.to_str().unwrap(), "new_file.txt");
-    assert_eq!(status[0].status, crabontree_git::WorkingDirStatus::Untracked);
+    assert_eq!(
+        status[0].status,
+        crabontree_git::WorkingDirStatus::Untracked
+    );
     assert!(!status[0].is_staged);
 }
 
@@ -216,14 +223,21 @@ fn test_working_dir_status_mixed() {
     assert_eq!(status.len(), 2, "Should have 2 changed files");
 
     // Check for both files
-    let readme = status.iter().find(|f| f.path.to_str().unwrap() == "README.md");
-    let untracked = status.iter().find(|f| f.path.to_str().unwrap() == "untracked.txt");
+    let readme = status
+        .iter()
+        .find(|f| f.path.to_str().unwrap() == "README.md");
+    let untracked = status
+        .iter()
+        .find(|f| f.path.to_str().unwrap() == "untracked.txt");
 
     assert!(readme.is_some(), "README.md should be in status");
     assert!(untracked.is_some(), "untracked.txt should be in status");
 
     assert!(readme.unwrap().is_staged, "README.md should be staged");
-    assert!(!untracked.unwrap().is_staged, "untracked.txt should not be staged");
+    assert!(
+        !untracked.unwrap().is_staged,
+        "untracked.txt should not be staged"
+    );
 }
 
 #[test]

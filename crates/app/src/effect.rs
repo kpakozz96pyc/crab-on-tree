@@ -62,7 +62,6 @@ pub enum Effect {
     LoadAuthorIdentity(PathBuf),
 
     // ===== 4-Pane Layout Effects =====
-
     /// Load branch tree.
     LoadBranchTree(PathBuf),
 

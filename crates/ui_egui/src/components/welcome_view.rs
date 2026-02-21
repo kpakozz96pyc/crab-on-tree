@@ -1,6 +1,6 @@
-/// Welcome view component shown when no repository is open.
-///
-/// Displays a welcome message, Open button, and list of recent repositories.
+//! Welcome view component shown when no repository is open.
+//!
+//! Displays a welcome message, Open button, and list of recent repositories.
 
 use crabontree_app::AppMessage;
 use eframe::egui;

@@ -1,6 +1,6 @@
-/// Keyboard shortcuts help dialog component.
-///
-/// Displays a window with all keyboard shortcuts organized by category.
+//! Keyboard shortcuts help dialog component.
+//!
+//! Displays a window with all keyboard shortcuts organized by category.
 
 use eframe::egui;
 

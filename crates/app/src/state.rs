@@ -1,8 +1,8 @@
 //! Application state types.
 
+use crabontree_git::{Commit, DiffHunk, FileDiff, StatusSummary, WorkingDirFile};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use crabontree_git::{Commit, DiffHunk, FileDiff, StatusSummary, WorkingDirFile};
 
 /// Dialog for handling uncommitted changes before checkout.
 #[derive(Debug, Clone)]
@@ -20,7 +20,7 @@ pub struct BranchConflictDialog {
 }
 
 /// Main application state.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct AppState {
     pub current_repo: Option<RepoState>,
     pub loading: bool,
@@ -30,21 +30,6 @@ pub struct AppState {
     pub staging_progress: Option<StagingProgress>,
     pub checkout_changes_dialog: Option<CheckoutChangesDialog>,
     pub branch_conflict_dialog: Option<BranchConflictDialog>,
-}
-
-impl Default for AppState {
-    fn default() -> Self {
-        Self {
-            current_repo: None,
-            loading: false,
-            committing: false,
-            error: None,
-            config: super::AppConfig::default(),
-            staging_progress: None,
-            checkout_changes_dialog: None,
-            branch_conflict_dialog: None,
-        }
-    }
 }
 
 /// Progress information for staging operations.
@@ -111,8 +96,9 @@ pub enum DiffViewMode {
 }
 
 /// File viewer state (Pane 4).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum FileViewState {
+    #[default]
     None,
     Content {
         path: PathBuf,
@@ -132,12 +118,6 @@ pub enum FileViewState {
         path: PathBuf,
         size: u64,
     },
-}
-
-impl Default for FileViewState {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 /// State of an open repository.
@@ -161,7 +141,12 @@ pub struct RepoState {
 }
 
 impl RepoState {
-    pub fn new(path: PathBuf, head: String, branches: Vec<String>, status_summary: StatusSummary) -> Self {
+    pub fn new(
+        path: PathBuf,
+        head: String,
+        branches: Vec<String>,
+        status_summary: StatusSummary,
+    ) -> Self {
         Self {
             path,
             head,

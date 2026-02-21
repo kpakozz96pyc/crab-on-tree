@@ -1,7 +1,7 @@
-/// File content view widget for displaying files with line numbers.
-///
-/// This widget handles the display of file content with line numbers
-/// in a monospace font.
+//! File content view widget for displaying files with line numbers.
+//!
+//! This widget handles the display of file content with line numbers
+//! in a monospace font.
 
 use eframe::egui;
 use std::path::Path;

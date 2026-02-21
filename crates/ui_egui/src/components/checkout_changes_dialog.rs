@@ -1,4 +1,4 @@
-/// Dialog for handling uncommitted changes before branch checkout.
+//! Dialog for handling uncommitted changes before branch checkout.
 
 use crabontree_app::{AppMessage, CheckoutChangesDialog};
 use eframe::egui;

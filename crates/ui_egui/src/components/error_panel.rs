@@ -1,7 +1,7 @@
-/// Error panel component for displaying error messages.
-///
-/// Shows a dismissible error banner at the top of the application
-/// when an error occurs.
+//! Error panel component for displaying error messages.
+//!
+//! Shows a dismissible error banner at the top of the application
+//! when an error occurs.
 
 use crabontree_app::AppMessage;
 use crabontree_ui_core::Color;
@@ -16,11 +16,7 @@ pub enum ErrorPanelAction {
 /// Renders the error panel if an error is present.
 ///
 /// Returns an action that the caller should handle.
-pub fn render(
-    ctx: &egui::Context,
-    error: Option<&String>,
-    error_color: Color,
-) -> ErrorPanelAction {
+pub fn render(ctx: &egui::Context, error: Option<&String>, error_color: Color) -> ErrorPanelAction {
     let mut action = ErrorPanelAction::None;
 
     if let Some(error_msg) = error {

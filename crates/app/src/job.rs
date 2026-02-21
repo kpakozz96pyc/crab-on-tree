@@ -73,7 +73,6 @@ pub enum Job {
     LoadAuthorIdentity(PathBuf),
 
     // ===== 4-Pane Layout Jobs =====
-
     /// Load branch tree.
     LoadBranchTree(PathBuf),
 

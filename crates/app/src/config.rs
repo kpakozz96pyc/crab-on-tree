@@ -111,8 +111,7 @@ pub fn save_config(config: &AppConfig) -> anyhow::Result<()> {
             .with_context(|| format!("Failed to create config directory: {}", parent.display()))?;
     }
 
-    let contents = toml::to_string_pretty(config)
-        .context("Failed to serialize configuration")?;
+    let contents = toml::to_string_pretty(config).context("Failed to serialize configuration")?;
 
     fs::write(&path, contents)
         .with_context(|| format!("Failed to write config file: {}", path.display()))?;

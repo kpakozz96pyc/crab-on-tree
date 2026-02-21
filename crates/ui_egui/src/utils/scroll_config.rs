@@ -1,8 +1,8 @@
-/// Scroll area configuration utilities for consistent scroll behavior across panes.
-///
-/// All scroll areas in the application should use these utilities to ensure:
-/// - Content takes full width (scrollbar at pane edge)
-/// - No auto-shrinking to content size
+//! Scroll area configuration utilities for consistent scroll behavior across panes.
+//!
+//! All scroll areas in the application should use these utilities to ensure:
+//! - Content takes full width (scrollbar at pane edge)
+//! - No auto-shrinking to content size
 
 use eframe::egui;
 

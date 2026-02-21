@@ -142,7 +142,11 @@ fn test_repo_refreshed() {
         &mut state,
         AppMessage::RepoRefreshed {
             head: "develop".to_string(),
-            branches: vec!["main".to_string(), "develop".to_string(), "feature".to_string()],
+            branches: vec![
+                "main".to_string(),
+                "develop".to_string(),
+                "feature".to_string(),
+            ],
             status: StatusSummary::default(),
         },
     );

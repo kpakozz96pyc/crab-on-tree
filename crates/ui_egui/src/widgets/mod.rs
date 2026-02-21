@@ -1,4 +1,4 @@
-/// Reusable UI widgets for the CrabOnTree application
+//! Reusable UI widgets for the CrabOnTree application.
 
 pub mod diff_view;
 pub mod file_content;
