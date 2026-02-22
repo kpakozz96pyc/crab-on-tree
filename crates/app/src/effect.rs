@@ -128,4 +128,16 @@ pub enum Effect {
         repo_path: PathBuf,
         file_paths: Vec<PathBuf>,
     },
+
+    /// Revert a file to HEAD state.
+    RevertFile {
+        repo_path: PathBuf,
+        file_path: PathBuf,
+    },
+
+    /// Open a file in the system's default editor.
+    OpenInEditor { full_path: PathBuf },
+
+    /// Open the folder containing a file in the system's file manager.
+    OpenFolder { full_path: PathBuf },
 }

@@ -139,4 +139,10 @@ pub enum Job {
         repo_path: PathBuf,
         file_paths: Vec<PathBuf>,
     },
+
+    /// Revert a file to HEAD state.
+    RevertFile {
+        repo_path: PathBuf,
+        file_path: PathBuf,
+    },
 }

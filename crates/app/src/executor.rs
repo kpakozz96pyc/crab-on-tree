@@ -153,6 +153,10 @@ fn worker_thread(
                     repo_path,
                     file_paths,
                 } => execute_load_multiple_file_diffs(repo_path, file_paths).await,
+                Job::RevertFile {
+                    repo_path,
+                    file_path,
+                } => execute_revert_file(repo_path, file_path).await,
             };
 
             match result {

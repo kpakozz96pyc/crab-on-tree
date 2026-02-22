@@ -27,6 +27,9 @@ pub enum ChangedFilesAction {
         amend: bool,
         push: bool,
     },
+    RevertFile(PathBuf),
+    OpenInEditor(PathBuf),
+    OpenFolder(PathBuf),
 }
 
 fn render_section(
@@ -36,46 +39,73 @@ fn render_section(
     files: &[crabontree_app::WorkingDirFile],
     selected_files: &std::collections::HashSet<PathBuf>,
     is_commit_view: bool,
+    show_context_menu: bool,
     action: &mut ChangedFilesAction,
 ) {
-    if files.is_empty() {
-        return;
-    }
-
     egui::CollapsingHeader::new(format!("{} ({})", title, files.len()))
         .id_source(id)
         .default_open(true)
         .show(ui, |ui| {
-            for (idx, file) in files.iter().enumerate() {
-                ui.push_id(format!("{}_{}", id, idx), |ui| {
-                    let is_selected = selected_files.contains(&file.path);
-                    let interaction =
-                        FileRow::new(&file.path, &file.status, is_selected).render(ui);
+            if files.is_empty() {
+                ui.label(egui::RichText::new("No files").weak());
+                return;
+            }
 
-                    match interaction {
-                        FileRowInteraction::SingleClick { ctrl, shift } => {
-                            if ctrl || shift {
-                                *action = ChangedFilesAction::SelectFileWithModifiers {
-                                    path: file.path.clone(),
-                                    ctrl,
-                                    shift,
-                                };
-                            } else {
-                                *action = ChangedFilesAction::SelectFile(file.path.clone());
-                            }
+            for (idx, file) in files.iter().enumerate() {
+                let (interaction, row_response) =
+                    ui.push_id(format!("{}_{}", id, idx), |ui| {
+                        let is_selected = selected_files.contains(&file.path);
+                        FileRow::new(&file.path, &file.status, is_selected).render(ui)
+                    })
+                    .inner;
+
+                match interaction {
+                    FileRowInteraction::SingleClick { ctrl, shift } => {
+                        if ctrl || shift {
+                            *action = ChangedFilesAction::SelectFileWithModifiers {
+                                path: file.path.clone(),
+                                ctrl,
+                                shift,
+                            };
+                        } else {
+                            *action = ChangedFilesAction::SelectFile(file.path.clone());
                         }
-                        FileRowInteraction::DoubleClick => {
-                            // Only allow staging/unstaging in working directory view
-                            if !is_commit_view {
-                                *action = ChangedFilesAction::ToggleStage {
-                                    path: file.path.clone(),
-                                    is_staged: file.is_staged,
-                                };
-                            }
-                        }
-                        FileRowInteraction::None => {}
                     }
-                });
+                    FileRowInteraction::DoubleClick => {
+                        if !is_commit_view {
+                            *action = ChangedFilesAction::ToggleStage {
+                                path: file.path.clone(),
+                                is_staged: file.is_staged,
+                            };
+                        }
+                    }
+                    FileRowInteraction::None => {}
+                }
+
+                if show_context_menu {
+                    let path = file.path.clone();
+                    row_response.context_menu(|ui| {
+                        if ui.button("Revert Changes").clicked() {
+                            *action = ChangedFilesAction::RevertFile(path.clone());
+                            ui.close_menu();
+                        }
+                        if ui.button("Stage File").clicked() {
+                            *action = ChangedFilesAction::ToggleStage {
+                                path: path.clone(),
+                                is_staged: false,
+                            };
+                            ui.close_menu();
+                        }
+                        if ui.button("Open in External Editor").clicked() {
+                            *action = ChangedFilesAction::OpenInEditor(path.clone());
+                            ui.close_menu();
+                        }
+                        if ui.button("Open Folder").clicked() {
+                            *action = ChangedFilesAction::OpenFolder(path.clone());
+                            ui.close_menu();
+                        }
+                    });
+                }
             }
         });
 }
@@ -102,14 +132,14 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
     }
 
     if files.is_commit_view {
-        // Commit view: show commit message header then scrollable file list
-        if !files.commit_message.is_empty() {
-            egui::CollapsingHeader::new("Commit Message")
-                .id_source("changed_files_commit_message")
-                .default_open(true)
-                .show(ui, |ui| {
-                    egui::ScrollArea::vertical()
-                        .max_height(200.0)
+        // Commit view: commit message and changed files share one scroll area.
+        egui::ScrollArea::vertical()
+            .id_source("changed_files_scroll")
+            .show(ui, |ui| {
+                if !files.commit_message.is_empty() {
+                    egui::CollapsingHeader::new("Commit Message")
+                        .id_source("changed_files_commit_message")
+                        .default_open(true)
                         .show(ui, |ui| {
                             ui.add(
                                 egui::TextEdit::multiline(&mut files.commit_message.as_str())
@@ -118,13 +148,9 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                                     .font(egui::TextStyle::Monospace),
                             );
                         });
-                });
-            ui.add_space(5.0);
-        }
+                    ui.add_space(5.0);
+                }
 
-        egui::ScrollArea::vertical()
-            .id_source("changed_files_scroll")
-            .show(ui, |ui| {
                 render_section(
                     ui,
                     "changed_files_staged",
@@ -132,6 +158,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                     &files.staged,
                     &files.selected_files,
                     true,
+                    false,
                     &mut action,
                 );
                 render_section(
@@ -141,6 +168,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                     &files.unstaged,
                     &files.selected_files,
                     true,
+                    false,
                     &mut action,
                 );
                 render_section(
@@ -150,6 +178,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                     &files.untracked,
                     &files.selected_files,
                     true,
+                    false,
                     &mut action,
                 );
                 render_section(
@@ -159,20 +188,34 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                     &files.conflicted,
                     &files.selected_files,
                     true,
+                    false,
                     &mut action,
                 );
             });
     } else {
-        // Working directory view: file list limited to available height minus commit panel,
-        // then the commit panel pinned at the bottom.
-        let commit_panel_height = 200.0;
-        let list_height = (ui.available_height() - commit_panel_height).max(0.0);
+        // Working directory view:
+        // commit area is pinned to the bottom at fixed height,
+        // file list consumes all remaining height above it.
+        const COMMIT_PANEL_HEIGHT: f32 = 220.0;
+        const SEPARATOR_HEIGHT: f32 = 8.0;
+        let pane_rect = ui.available_rect_before_wrap();
+        ui.allocate_rect(pane_rect, egui::Sense::hover());
 
-        egui::ScrollArea::vertical()
-            .id_source("changed_files_scroll")
-            .max_height(list_height)
-            .show(ui, |ui| {
-                if !files.staged.is_empty() {
+        let commit_height = COMMIT_PANEL_HEIGHT.min(pane_rect.height());
+        let commit_top = pane_rect.bottom() - commit_height;
+        let list_bottom = (commit_top - SEPARATOR_HEIGHT).max(pane_rect.top());
+
+        let list_rect =
+            egui::Rect::from_min_max(pane_rect.min, egui::pos2(pane_rect.right(), list_bottom));
+        let commit_area_rect = egui::Rect::from_min_max(
+            egui::pos2(pane_rect.left(), commit_top),
+            egui::pos2(pane_rect.right(), pane_rect.bottom()),
+        );
+
+        ui.allocate_ui_at_rect(list_rect, |ui| {
+            egui::ScrollArea::vertical()
+                .id_source("changed_files_scroll")
+                .show(ui, |ui| {
                     render_section(
                         ui,
                         "changed_files_staged",
@@ -180,12 +223,11 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                         &files.staged,
                         &files.selected_files,
                         false,
+                        false,
                         &mut action,
                     );
                     ui.add_space(5.0);
-                }
 
-                if !files.unstaged.is_empty() {
                     render_section(
                         ui,
                         "changed_files_unstaged",
@@ -193,12 +235,11 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                         &files.unstaged,
                         &files.selected_files,
                         false,
+                        true, // show context menu for unstaged files
                         &mut action,
                     );
                     ui.add_space(5.0);
-                }
 
-                if !files.untracked.is_empty() {
                     render_section(
                         ui,
                         "changed_files_untracked",
@@ -206,12 +247,11 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                         &files.untracked,
                         &files.selected_files,
                         false,
+                        false,
                         &mut action,
                     );
                     ui.add_space(5.0);
-                }
 
-                if !files.conflicted.is_empty() {
                     render_section(
                         ui,
                         "changed_files_conflicted",
@@ -219,19 +259,30 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                         &files.conflicted,
                         &files.selected_files,
                         false,
+                        false,
                         &mut action,
                     );
-                }
-            });
+                });
+        });
 
-        ui.separator();
+        // Separator line between file list and commit panel.
+        if list_bottom < commit_top {
+            let y = list_bottom + (SEPARATOR_HEIGHT * 0.5);
+            ui.painter().line_segment(
+                [
+                    egui::pos2(pane_rect.left(), y),
+                    egui::pos2(pane_rect.right(), y),
+                ],
+                egui::Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color),
+            );
+        }
 
-        let commit_area_rect = ui.available_rect_before_wrap();
+        let mut commit_ui = ui.child_ui(commit_area_rect, egui::Layout::top_down(egui::Align::Min));
 
         let has_staged_files = !files.staged.is_empty();
 
         // Commit summary
-        ui.horizontal(|ui| {
+        commit_ui.horizontal(|ui| {
             ui.label("Summary:");
             let summary_len = files.commit_summary.chars().count();
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -240,7 +291,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
         });
 
         let mut summary = files.commit_summary.clone();
-        let summary_response = ui.add(
+        let summary_response = commit_ui.add(
             egui::TextEdit::singleline(&mut summary)
                 .desired_width(f32::INFINITY)
                 .hint_text(
@@ -251,12 +302,12 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
             action = ChangedFilesAction::CommitSummaryUpdated(summary);
         }
 
-        ui.add_space(5.0);
+        commit_ui.add_space(5.0);
 
         // Commit description
-        ui.label("Description:");
+        commit_ui.label("Description:");
         let mut description = files.commit_description.clone();
-        let description_response = ui.add(
+        let description_response = commit_ui.add(
             egui::TextEdit::multiline(&mut description)
                 .desired_width(f32::INFINITY)
                 .desired_rows(3)
@@ -268,7 +319,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
             action = ChangedFilesAction::CommitDescriptionUpdated(description);
         }
 
-        ui.add_space(5.0);
+        commit_ui.add_space(5.0);
 
         // Checkboxes (left column) and Commit button (right side)
         // Declare outside closures so the button can read the up-to-date toggled values
@@ -276,7 +327,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
         let mut amend = files.amend_last_commit;
         let mut push = files.push_after_commit;
 
-        ui.horizontal(|ui| {
+        commit_ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 if ui.checkbox(&mut amend, "Amend last commit").changed() {
                     action = ChangedFilesAction::AmendLastCommitToggled(amend);
@@ -305,7 +356,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
 
         // Draw loading overlay if loading
         if loading {
-            let painter = ui.painter();
+            let painter = commit_ui.painter();
 
             // Draw semi-transparent overlay
             painter.rect_filled(commit_area_rect, 0.0, egui::Color32::from_black_alpha(128));
@@ -314,7 +365,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
             let center = commit_area_rect.center();
             let spinner_rect = egui::Rect::from_center_size(center, egui::vec2(100.0, 50.0));
 
-            ui.allocate_ui_at_rect(spinner_rect, |ui| {
+            commit_ui.allocate_ui_at_rect(spinner_rect, |ui| {
                 ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
                     ui.add_space(5.0);
                     ui.spinner();
@@ -370,5 +421,10 @@ pub fn action_to_message(action: ChangedFilesAction) -> Option<AppMessage> {
             amend,
             push,
         }),
+        ChangedFilesAction::RevertFile(path) => Some(AppMessage::RevertFileRequested(path)),
+        ChangedFilesAction::OpenInEditor(path) => {
+            Some(AppMessage::OpenFileInEditorRequested(path))
+        }
+        ChangedFilesAction::OpenFolder(path) => Some(AppMessage::OpenFileFolderRequested(path)),
     }
 }

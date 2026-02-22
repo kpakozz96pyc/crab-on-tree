@@ -70,6 +70,10 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
         | AppMessage::FileDiffLoaded { .. }
         | AppMessage::MultipleFileDiffsLoaded { .. }
         | AppMessage::BinaryFileDetected { .. }
-        | AppMessage::DiffViewModeChanged(_)) => file_handlers::handle(state, m),
+        | AppMessage::DiffViewModeChanged(_)
+        | AppMessage::RevertFileRequested(_)
+        | AppMessage::RevertFileCompleted
+        | AppMessage::OpenFileInEditorRequested(_)
+        | AppMessage::OpenFileFolderRequested(_)) => file_handlers::handle(state, m),
     }
 }

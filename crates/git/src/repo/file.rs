@@ -127,6 +127,17 @@ impl GitRepository {
         Ok(hunks)
     }
 
+    /// Revert a file to its HEAD state (discard working directory changes).
+    #[instrument(skip(self))]
+    pub fn revert_file(&self, file_path: &Path) -> Result<(), GitError> {
+        let mut checkout_builder = git2::build::CheckoutBuilder::new();
+        checkout_builder.force();
+        checkout_builder.path(file_path);
+        self.git2_repo.checkout_head(Some(&mut checkout_builder))?;
+        tracing::debug!("Reverted file: {}", file_path.display());
+        Ok(())
+    }
+
     /// Check if a file is binary (contains null bytes).
     #[instrument(skip(self))]
     pub fn is_binary_file(&self, file_path: &Path) -> Result<bool, GitError> {

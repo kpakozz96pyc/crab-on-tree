@@ -229,4 +229,16 @@ pub enum AppMessage {
         amend: bool,
         push: bool,
     },
+
+    /// User requested to revert a file to HEAD state.
+    RevertFileRequested(PathBuf),
+
+    /// File was successfully reverted.
+    RevertFileCompleted,
+
+    /// User requested to open a file in an external editor.
+    OpenFileInEditorRequested(PathBuf),
+
+    /// User requested to open the folder containing a file.
+    OpenFileFolderRequested(PathBuf),
 }

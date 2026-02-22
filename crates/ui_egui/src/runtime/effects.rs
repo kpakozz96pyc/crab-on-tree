@@ -187,6 +187,31 @@ impl CrabOnTreeApp {
                         override_existing,
                     });
             }
+            Effect::RevertFile {
+                repo_path,
+                file_path,
+            } => {
+                self.executor.submit(crabontree_app::Job::RevertFile {
+                    repo_path,
+                    file_path,
+                });
+            }
+            Effect::OpenInEditor { full_path } => {
+                if let Err(e) = std::process::Command::new("xdg-open")
+                    .arg(&full_path)
+                    .spawn()
+                {
+                    tracing::warn!("Failed to open file in editor: {}", e);
+                }
+            }
+            Effect::OpenFolder { full_path } => {
+                if let Err(e) = std::process::Command::new("xdg-open")
+                    .arg(&full_path)
+                    .spawn()
+                {
+                    tracing::warn!("Failed to open folder: {}", e);
+                }
+            }
         }
     }
 }

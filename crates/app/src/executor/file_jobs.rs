@@ -130,6 +130,20 @@ pub(super) async fn execute_load_file_diff(
     })
 }
 
+/// Execute the RevertFile job.
+#[instrument(skip(repo_path, file_path))]
+pub(super) async fn execute_revert_file(
+    repo_path: PathBuf,
+    file_path: PathBuf,
+) -> anyhow::Result<AppMessage> {
+    run_repo_job(repo_path, move |repo| {
+        repo.revert_file(&file_path)
+            .context("Failed to revert file")?;
+        Ok(AppMessage::RevertFileCompleted)
+    })
+    .await
+}
+
 /// Execute the LoadMultipleFileDiffs job.
 #[instrument(skip(repo_path, file_paths))]
 pub(super) async fn execute_load_multiple_file_diffs(

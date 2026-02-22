@@ -308,6 +308,47 @@ pub(super) fn handle(state: &mut AppState, msg: AppMessage) -> Effect {
             Effect::None
         }
 
+        AppMessage::RevertFileRequested(path) => {
+            if let Some(repo) = &state.current_repo {
+                state.loading = true;
+                Effect::RevertFile {
+                    repo_path: repo.path.clone(),
+                    file_path: path,
+                }
+            } else {
+                Effect::None
+            }
+        }
+
+        AppMessage::RevertFileCompleted => {
+            state.loading = false;
+            if let Some(repo) = &state.current_repo {
+                Effect::LoadChangedFiles(repo.path.clone())
+            } else {
+                Effect::None
+            }
+        }
+
+        AppMessage::OpenFileInEditorRequested(path) => {
+            if let Some(repo) = &state.current_repo {
+                Effect::OpenInEditor {
+                    full_path: repo.path.join(path),
+                }
+            } else {
+                Effect::None
+            }
+        }
+
+        AppMessage::OpenFileFolderRequested(path) => {
+            if let Some(repo) = &state.current_repo {
+                let full = repo.path.join(&path);
+                let folder = full.parent().map(|p| p.to_path_buf()).unwrap_or(full);
+                Effect::OpenFolder { full_path: folder }
+            } else {
+                Effect::None
+            }
+        }
+
         _ => unreachable!("file_handlers received unexpected message"),
     }
 }

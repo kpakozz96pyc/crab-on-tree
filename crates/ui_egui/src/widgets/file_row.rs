@@ -36,27 +36,27 @@ impl<'a> FileRow<'a> {
         }
     }
 
-    /// Renders the file row and returns the interaction type.
-    pub fn render(self, ui: &mut egui::Ui) -> FileRowInteraction {
+    /// Renders the file row and returns the interaction type and the row's egui Response.
+    pub fn render(self, ui: &mut egui::Ui) -> (FileRowInteraction, egui::Response) {
         let (status_icon, status_color) = self.get_status_info();
 
-        let response = ui
-            .horizontal(|ui| {
-                ui.set_min_width(ui.available_width());
-                ui.colored_label(status_color, egui::RichText::new(status_icon).strong());
-                ui.selectable_label(self.is_selected, self.path.display().to_string())
-            })
-            .inner;
+        let row = ui.horizontal(|ui| {
+            ui.set_min_width(ui.available_width());
+            ui.colored_label(status_color, egui::RichText::new(status_icon).strong());
+            ui.selectable_label(self.is_selected, self.path.display().to_string())
+        });
 
-        if response.double_clicked() {
+        let interaction = if row.inner.double_clicked() {
             FileRowInteraction::DoubleClick
-        } else if response.clicked() {
+        } else if row.inner.clicked() {
             let ctrl = ui.input(|i| i.modifiers.ctrl || i.modifiers.command);
             let shift = ui.input(|i| i.modifiers.shift);
             FileRowInteraction::SingleClick { ctrl, shift }
         } else {
             FileRowInteraction::None
-        }
+        };
+
+        (interaction, row.inner)
     }
 
     /// Gets the status icon and color for the current file status.
