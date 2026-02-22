@@ -68,7 +68,7 @@ impl eframe::App for CrabOnTreeApp {
         }
 
         egui::CentralPanel::default()
-            .frame(egui::Frame::none().inner_margin(egui::Margin::same(10.0)))
+            .frame(egui::Frame::none())
             .show(ctx, |ui| {
                 if self.state.current_repo.is_some() {
                     self.render_repository_view(ui);
