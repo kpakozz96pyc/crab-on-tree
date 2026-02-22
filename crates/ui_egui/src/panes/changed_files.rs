@@ -52,8 +52,8 @@ fn render_section(
             }
 
             for (idx, file) in files.iter().enumerate() {
-                let (interaction, row_response) =
-                    ui.push_id(format!("{}_{}", id, idx), |ui| {
+                let (interaction, row_response) = ui
+                    .push_id(format!("{}_{}", id, idx), |ui| {
                         let is_selected = selected_files.contains(&file.path);
                         FileRow::new(&file.path, &file.status, is_selected).render(ui)
                     })
@@ -96,6 +96,7 @@ fn render_section(
                             };
                             ui.close_menu();
                         }
+                        ui.separator();
                         if ui.button("Open in External Editor").clicked() {
                             *action = ChangedFilesAction::OpenInEditor(path.clone());
                             ui.close_menu();
@@ -422,9 +423,7 @@ pub fn action_to_message(action: ChangedFilesAction) -> Option<AppMessage> {
             push,
         }),
         ChangedFilesAction::RevertFile(path) => Some(AppMessage::RevertFileRequested(path)),
-        ChangedFilesAction::OpenInEditor(path) => {
-            Some(AppMessage::OpenFileInEditorRequested(path))
-        }
+        ChangedFilesAction::OpenInEditor(path) => Some(AppMessage::OpenFileInEditorRequested(path)),
         ChangedFilesAction::OpenFolder(path) => Some(AppMessage::OpenFileFolderRequested(path)),
     }
 }
