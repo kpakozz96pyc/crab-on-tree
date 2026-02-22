@@ -87,7 +87,12 @@ impl GitRepository {
     #[instrument(skip(self))]
     pub fn stage_file(&self, path: &std::path::Path) -> Result<(), GitError> {
         let mut index = self.git2_repo.index()?;
-        index.add_path(path)?;
+        let full_path = self.path().join(path);
+        if full_path.exists() {
+            index.add_path(path)?;
+        } else {
+            index.remove_path(path)?;
+        }
         index.write()?;
         tracing::debug!("Staged file: {}", path.display());
         Ok(())
@@ -139,10 +144,15 @@ impl GitRepository {
         let mut index = self.git2_repo.index()?;
         const CHUNK_SIZE: usize = 500;
 
+        let repo_path = self.path().to_path_buf();
         for (chunk_idx, chunk) in paths.chunks(CHUNK_SIZE).enumerate() {
             tracing::debug!("Processing chunk {} ({} files)", chunk_idx + 1, chunk.len());
             for path in chunk {
-                index.add_path(path)?;
+                if repo_path.join(path).exists() {
+                    index.add_path(path)?;
+                } else {
+                    index.remove_path(path)?;
+                }
             }
             index.write()?;
             tracing::debug!(
