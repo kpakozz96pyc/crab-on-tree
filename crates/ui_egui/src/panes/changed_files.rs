@@ -1,6 +1,5 @@
 use crate::widgets::{render_with_bottom_panel, FileRow, FileRowInteraction};
-use crabontree_app::{AppMessage, ChangedFilesState, CommitInfo};
-use crabontree_ui_core::{format_absolute_time, format_relative_time};
+use crabontree_app::{AppMessage, ChangedFilesState};
 use eframe::egui;
 use std::path::PathBuf;
 
@@ -33,90 +32,6 @@ pub enum ChangedFilesAction {
     OpenFolder(PathBuf),
 }
 
-
-fn render_commit_info_panel(ui: &mut egui::Ui, info: &CommitInfo, commit_message: &str) {
-    // Avatar + metadata row
-    ui.horizontal(|ui| {
-        // Avatar: circle with the author's initial
-        let avatar_size = egui::vec2(52.0, 52.0);
-        let (rect, _) = ui.allocate_exact_size(avatar_size, egui::Sense::hover());
-        if ui.is_rect_visible(rect) {
-            let painter = ui.painter();
-            painter.circle_filled(
-                rect.center(),
-                26.0,
-                egui::Color32::from_rgb(80, 100, 180),
-            );
-            let initial = info
-                .author_name
-                .chars()
-                .next()
-                .map(|c| c.to_uppercase().to_string())
-                .unwrap_or_else(|| "?".to_string());
-            painter.text(
-                rect.center(),
-                egui::Align2::CENTER_CENTER,
-                &initial,
-                egui::FontId::proportional(22.0),
-                egui::Color32::WHITE,
-            );
-        }
-
-        ui.add_space(8.0);
-
-        // Key-value metadata grid
-        egui::Grid::new("commit_info_grid")
-            .num_columns(2)
-            .spacing(egui::vec2(8.0, 2.0))
-            .show(ui, |ui| {
-                ui.label(egui::RichText::new("Author:").strong());
-                ui.label(format!("{} <{}>", info.author_name, info.author_email));
-                ui.end_row();
-
-                ui.label(egui::RichText::new("Date:").strong());
-                let relative = format_relative_time(info.author_date);
-                let absolute = format_absolute_time(info.author_date);
-                ui.label(format!("{} ({})", relative, absolute));
-                ui.end_row();
-
-                ui.label(egui::RichText::new("Commit hash:").strong());
-                ui.label(egui::RichText::new(&info.hash).monospace());
-                ui.end_row();
-
-                if !info.parent_hashes.is_empty() {
-                    ui.label(egui::RichText::new("Parent(s):").strong());
-                    ui.label(
-                        egui::RichText::new(info.parent_hashes.join(" ")).monospace(),
-                    );
-                    ui.end_row();
-                }
-            });
-    });
-
-    // Commit message
-    if !commit_message.trim().is_empty() {
-        ui.add_space(5.0);
-        ui.label(commit_message.trim());
-        ui.add_space(5.0);
-    }
-
-    ui.separator();
-
-    // Branch/tag containment info
-    if info.branches.is_empty() {
-        ui.label(egui::RichText::new("Contained in no branch").weak());
-    } else {
-        ui.label(format!(
-            "Contained in branches: {}",
-            info.branches.join(", ")
-        ));
-    }
-    if info.tags.is_empty() {
-        ui.label(egui::RichText::new("Contained in no tag").weak());
-    } else {
-        ui.label(format!("Contained in tags: {}", info.tags.join(", ")));
-    }
-}
 
 fn render_section(
     ui: &mut egui::Ui,
@@ -285,7 +200,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
         |ui, panel_rect| {
             if is_commit_view {
                 if let Some(info) = &files.commit_info {
-                    render_commit_info_panel(ui, info, &files.commit_message);
+                    super::commit_info::render(ui, info, &files.commit_message);
                 } else if !files.commit_message.is_empty() {
                     egui::CollapsingHeader::new("Commit Message")
                         .id_source("changed_files_commit_message")
