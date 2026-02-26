@@ -26,5 +26,6 @@ pub use message::AppMessage;
 pub use reducer::reduce;
 pub use state::{
     AppState, BranchConflictDialog, BranchInfo, BranchTreeState, ChangedFilesState,
-    CheckoutChangesDialog, DiffViewMode, FileViewState, RepoState, StagingProgress, TagInfo,
+    CheckoutChangesDialog, CommitInfo, DiffViewMode, FileViewState, RepoState, StagingProgress,
+    TagInfo,
 };

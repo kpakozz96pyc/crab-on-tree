@@ -68,6 +68,18 @@ pub struct BranchTreeState {
     pub selected_branch: Option<String>, // Selected branch (for keyboard navigation)
 }
 
+/// Commit metadata for the commit info panel in the commit view.
+#[derive(Debug, Clone)]
+pub struct CommitInfo {
+    pub hash: String,
+    pub author_name: String,
+    pub author_email: String,
+    pub author_date: i64, // Unix timestamp
+    pub parent_hashes: Vec<String>,
+    pub branches: Vec<String>, // branch names whose HEAD is this commit
+    pub tags: Vec<String>,     // tag names pointing to this commit
+}
+
 /// Changed files state (Pane 3).
 #[derive(Debug, Clone)]
 pub struct ChangedFilesState {
@@ -80,6 +92,7 @@ pub struct ChangedFilesState {
     pub last_clicked_file: Option<PathBuf>, // For range selection
     pub commit_message: String,
     pub is_commit_view: bool, // true if viewing a commit, false if viewing working directory
+    pub commit_info: Option<CommitInfo>, // populated when is_commit_view is true
     // Commit panel fields
     pub commit_summary: String,
     pub commit_description: String,

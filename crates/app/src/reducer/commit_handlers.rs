@@ -57,17 +57,56 @@ pub(super) fn handle(state: &mut AppState, msg: AppMessage) -> Effect {
                     repo.commit_diff = Some(diff.clone());
                     tracing::info!("Loaded diff for commit {}", commit_hash);
 
-                    use crate::state::ChangedFilesState;
+                    use crate::state::{ChangedFilesState, CommitInfo};
                     use crate::WorkingDirFile;
                     use crate::WorkingDirStatus;
                     use std::path::PathBuf;
 
-                    let commit_message = repo
-                        .commits
-                        .iter()
-                        .find(|c| c.hash == commit_hash)
+                    let found_commit = repo.commits.iter().find(|c| c.hash == commit_hash);
+
+                    let commit_message = found_commit
                         .map(|c| c.message.clone())
                         .unwrap_or_default();
+
+                    let commit_info = found_commit.map(|c| {
+                        let branches = repo
+                            .branch_tree
+                            .as_ref()
+                            .map(|bt| {
+                                bt.local_branches
+                                    .iter()
+                                    .filter(|b| b.commit_hash == c.hash)
+                                    .map(|b| b.name.clone())
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+
+                        let tags = repo
+                            .branch_tree
+                            .as_ref()
+                            .map(|bt| {
+                                bt.tags
+                                    .iter()
+                                    .filter(|t| t.commit_hash == c.hash)
+                                    .map(|t| t.name.clone())
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+
+                        CommitInfo {
+                            hash: c.hash.clone(),
+                            author_name: c.author_name.clone(),
+                            author_email: c.author_email.clone(),
+                            author_date: c.author_date,
+                            parent_hashes: c
+                                .parent_hashes
+                                .iter()
+                                .map(|h| h.chars().take(10).collect())
+                                .collect(),
+                            branches,
+                            tags,
+                        }
+                    });
 
                     let mut changed_files = ChangedFilesState {
                         staged: Vec::new(),
@@ -79,6 +118,7 @@ pub(super) fn handle(state: &mut AppState, msg: AppMessage) -> Effect {
                         last_clicked_file: None,
                         commit_message,
                         is_commit_view: true,
+                        commit_info,
                         commit_summary: String::new(),
                         commit_description: String::new(),
                         amend_last_commit: false,

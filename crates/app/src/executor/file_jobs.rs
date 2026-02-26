@@ -40,6 +40,7 @@ pub(super) async fn execute_load_changed_files(path: PathBuf) -> anyhow::Result<
             last_clicked_file: None,
             commit_message: String::new(),
             is_commit_view: false,
+            commit_info: None,
             commit_summary: String::new(),
             commit_description: String::new(),
             amend_last_commit: false,

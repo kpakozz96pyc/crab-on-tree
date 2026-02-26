@@ -1,5 +1,6 @@
 use crate::widgets::{FileRow, FileRowInteraction};
-use crabontree_app::{AppMessage, ChangedFilesState};
+use crabontree_app::{AppMessage, ChangedFilesState, CommitInfo};
+use crabontree_ui_core::{format_absolute_time, format_relative_time};
 use eframe::egui;
 use std::path::PathBuf;
 
@@ -30,6 +31,91 @@ pub enum ChangedFilesAction {
     RevertFile(PathBuf),
     OpenInEditor(PathBuf),
     OpenFolder(PathBuf),
+}
+
+
+fn render_commit_info_panel(ui: &mut egui::Ui, info: &CommitInfo, commit_message: &str) {
+    // Avatar + metadata row
+    ui.horizontal(|ui| {
+        // Avatar: circle with the author's initial
+        let avatar_size = egui::vec2(52.0, 52.0);
+        let (rect, _) = ui.allocate_exact_size(avatar_size, egui::Sense::hover());
+        if ui.is_rect_visible(rect) {
+            let painter = ui.painter();
+            painter.circle_filled(
+                rect.center(),
+                26.0,
+                egui::Color32::from_rgb(80, 100, 180),
+            );
+            let initial = info
+                .author_name
+                .chars()
+                .next()
+                .map(|c| c.to_uppercase().to_string())
+                .unwrap_or_else(|| "?".to_string());
+            painter.text(
+                rect.center(),
+                egui::Align2::CENTER_CENTER,
+                &initial,
+                egui::FontId::proportional(22.0),
+                egui::Color32::WHITE,
+            );
+        }
+
+        ui.add_space(8.0);
+
+        // Key-value metadata grid
+        egui::Grid::new("commit_info_grid")
+            .num_columns(2)
+            .spacing(egui::vec2(8.0, 2.0))
+            .show(ui, |ui| {
+                ui.label(egui::RichText::new("Author:").strong());
+                ui.label(format!("{} <{}>", info.author_name, info.author_email));
+                ui.end_row();
+
+                ui.label(egui::RichText::new("Date:").strong());
+                let relative = format_relative_time(info.author_date);
+                let absolute = format_absolute_time(info.author_date);
+                ui.label(format!("{} ({})", relative, absolute));
+                ui.end_row();
+
+                ui.label(egui::RichText::new("Commit hash:").strong());
+                ui.label(egui::RichText::new(&info.hash).monospace());
+                ui.end_row();
+
+                if !info.parent_hashes.is_empty() {
+                    ui.label(egui::RichText::new("Parent(s):").strong());
+                    ui.label(
+                        egui::RichText::new(info.parent_hashes.join(" ")).monospace(),
+                    );
+                    ui.end_row();
+                }
+            });
+    });
+
+    // Commit message
+    if !commit_message.trim().is_empty() {
+        ui.add_space(5.0);
+        ui.label(commit_message.trim());
+        ui.add_space(5.0);
+    }
+
+    ui.separator();
+
+    // Branch/tag containment info
+    if info.branches.is_empty() {
+        ui.label(egui::RichText::new("Contained in no branch").weak());
+    } else {
+        ui.label(format!(
+            "Contained in branches: {}",
+            info.branches.join(", ")
+        ));
+    }
+    if info.tags.is_empty() {
+        ui.label(egui::RichText::new("Contained in no tag").weak());
+    } else {
+        ui.label(format!("Contained in tags: {}", info.tags.join(", ")));
+    }
 }
 
 fn render_section(
@@ -133,66 +219,101 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
     }
 
     if files.is_commit_view {
-        // Commit view: commit message and changed files share one scroll area.
-        egui::ScrollArea::vertical()
-            .id_source("changed_files_scroll")
-            .show(ui, |ui| {
-                if !files.commit_message.is_empty() {
-                    egui::CollapsingHeader::new("Commit Message")
-                        .id_source("changed_files_commit_message")
-                        .default_open(true)
-                        .show(ui, |ui| {
-                            ui.add(
-                                egui::TextEdit::multiline(&mut files.commit_message.as_str())
-                                    .desired_width(f32::INFINITY)
-                                    .interactive(false)
-                                    .font(egui::TextStyle::Monospace),
-                            );
-                        });
-                    ui.add_space(5.0);
-                }
+        // Commit view: commit info panel is pinned to the bottom,
+        // file list consumes all remaining height above it.
+        const COMMIT_INFO_HEIGHT: f32 = 230.0;
+        const SEPARATOR_HEIGHT: f32 = 8.0;
+        let pane_rect = ui.available_rect_before_wrap();
+        ui.allocate_rect(pane_rect, egui::Sense::hover());
 
-                render_section(
-                    ui,
-                    "changed_files_staged",
-                    "Staged",
-                    &files.staged,
-                    &files.selected_files,
-                    true,
-                    false,
-                    &mut action,
-                );
-                render_section(
-                    ui,
-                    "changed_files_unstaged",
-                    "Unstaged",
-                    &files.unstaged,
-                    &files.selected_files,
-                    true,
-                    false,
-                    &mut action,
-                );
-                render_section(
-                    ui,
-                    "changed_files_untracked",
-                    "Untracked",
-                    &files.untracked,
-                    &files.selected_files,
-                    true,
-                    false,
-                    &mut action,
-                );
-                render_section(
-                    ui,
-                    "changed_files_conflicted",
-                    "Conflicted",
-                    &files.conflicted,
-                    &files.selected_files,
-                    true,
-                    false,
-                    &mut action,
-                );
-            });
+        let info_height = COMMIT_INFO_HEIGHT.min(pane_rect.height());
+        let info_top = pane_rect.bottom() - info_height;
+        let list_bottom = (info_top - SEPARATOR_HEIGHT).max(pane_rect.top());
+
+        let list_rect =
+            egui::Rect::from_min_max(pane_rect.min, egui::pos2(pane_rect.right(), list_bottom));
+        let info_area_rect = egui::Rect::from_min_max(
+            egui::pos2(pane_rect.left(), info_top),
+            egui::pos2(pane_rect.right(), pane_rect.bottom()),
+        );
+
+        // File list above the commit info panel.
+        ui.allocate_ui_at_rect(list_rect, |ui| {
+            egui::ScrollArea::vertical()
+                .id_source("changed_files_scroll")
+                .show(ui, |ui| {
+                    render_section(
+                        ui,
+                        "changed_files_staged",
+                        "Staged",
+                        &files.staged,
+                        &files.selected_files,
+                        true,
+                        false,
+                        &mut action,
+                    );
+                    render_section(
+                        ui,
+                        "changed_files_unstaged",
+                        "Unstaged",
+                        &files.unstaged,
+                        &files.selected_files,
+                        true,
+                        false,
+                        &mut action,
+                    );
+                    render_section(
+                        ui,
+                        "changed_files_untracked",
+                        "Untracked",
+                        &files.untracked,
+                        &files.selected_files,
+                        true,
+                        false,
+                        &mut action,
+                    );
+                    render_section(
+                        ui,
+                        "changed_files_conflicted",
+                        "Conflicted",
+                        &files.conflicted,
+                        &files.selected_files,
+                        true,
+                        false,
+                        &mut action,
+                    );
+                });
+        });
+
+        // Separator line between file list and commit info panel.
+        if list_bottom < info_top {
+            let y = list_bottom + (SEPARATOR_HEIGHT * 0.5);
+            ui.painter().line_segment(
+                [
+                    egui::pos2(pane_rect.left(), y),
+                    egui::pos2(pane_rect.right(), y),
+                ],
+                egui::Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color),
+            );
+        }
+
+        // Commit info panel pinned to the bottom.
+        let mut info_ui = ui.child_ui(info_area_rect, egui::Layout::top_down(egui::Align::Min));
+        if let Some(info) = &files.commit_info {
+            render_commit_info_panel(&mut info_ui, info, &files.commit_message);
+        } else if !files.commit_message.is_empty() {
+            egui::CollapsingHeader::new("Commit Message")
+                .id_source("changed_files_commit_message")
+                .default_open(true)
+                .show(&mut info_ui, |ui| {
+                    ui.add(
+                        egui::TextEdit::multiline(&mut files.commit_message.as_str())
+                            .desired_width(f32::INFINITY)
+                            .interactive(false)
+                            .font(egui::TextStyle::Monospace),
+                    );
+                });
+        }
     } else {
         // Working directory view:
         // commit area is pinned to the bottom at fixed height,
