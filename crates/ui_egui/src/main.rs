@@ -25,10 +25,15 @@ fn main() -> anyhow::Result<()> {
 
     tracing::info!("Starting CrabOnTree");
 
+    let icon = eframe::icon_data::from_png_bytes(include_bytes!("../cot.png"))
+        .map_err(|e| anyhow::anyhow!("Failed to load app icon: {}", e))?;
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1024.0, 768.0])
-            .with_title("CrabOnTree"),
+            .with_app_id("crabontree")
+            .with_title("CrabOnTree")
+            .with_icon(icon),
         ..Default::default()
     };
 

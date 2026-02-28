@@ -63,7 +63,9 @@ impl CrabOnTreeApp {
             self.handle_message(crabontree_app::AppMessage::LoadBranchTreeRequested);
         }
         if need_changed_files {
-            self.handle_message(crabontree_app::AppMessage::LoadChangedFilesRequested);
+            self.handle_message(crabontree_app::AppMessage::CommitSelected(
+                crabontree_app::WORKING_DIR_HASH.to_string(),
+            ));
         }
 
         let repo_data = if let Some(repo) = &self.state.current_repo {
