@@ -1,7 +1,6 @@
 use crate::runtime::CrabOnTreeApp;
 use crate::{components, utils::theme};
 use crabontree_app::save_config;
-use crabontree_ui_core::Theme;
 use eframe::egui;
 
 impl eframe::App for CrabOnTreeApp {
@@ -18,6 +17,7 @@ impl eframe::App for CrabOnTreeApp {
             self.state.current_repo.is_some(),
             self.state.loading,
             &visible_panes,
+            &self.available_themes,
             &self.state.config.theme,
         );
 
@@ -26,8 +26,8 @@ impl eframe::App for CrabOnTreeApp {
         }
 
         if let components::top_panel::TopPanelAction::SetTheme(name) = &top_action {
-            if let Some(new_theme) = Theme::by_name(name) {
-                self.theme = new_theme;
+            if let Some((_, new_theme)) = self.available_themes.iter().find(|(id, _)| id == name) {
+                self.theme = new_theme.clone();
                 self.state.config.theme = name.clone();
                 if let Err(e) = save_config(&self.state.config) {
                     tracing::warn!("Failed to save config after theme change: {}", e);

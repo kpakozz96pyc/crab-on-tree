@@ -9,6 +9,11 @@ use serde::{Deserialize, Serialize};
 /// Application theme.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Theme {
+    /// Human-readable display name shown in the theme picker (e.g. "Dark (GitHub)").
+    /// Defaults to empty string; callers fall back to the theme's file-stem id.
+    #[serde(default)]
+    pub name: String,
+
     // Background colors
     pub bg_primary: Color,
     pub bg_secondary: Color,
@@ -57,6 +62,8 @@ impl Theme {
             "light" => include_str!("themes/light.toml"),
             "jetbrains" => include_str!("themes/jetbrains.toml"),
             "visual_studio" => include_str!("themes/visual_studio.toml"),
+            "crema" => include_str!("themes/crema.toml"),
+            "ide-like" => include_str!("themes/ide-like.toml"),
             _ => return None,
         };
         match toml::from_str(toml) {
@@ -93,7 +100,10 @@ mod tests {
             let theme = Theme::by_name(name).unwrap();
             // pane_border must be a valid, non-zero color
             let c = theme.pane_border;
-            assert!(c.r >= 0.0 && c.r <= 1.0, "{name}: pane_border.r out of range");
+            assert!(
+                c.r >= 0.0 && c.r <= 1.0,
+                "{name}: pane_border.r out of range"
+            );
         }
     }
 }

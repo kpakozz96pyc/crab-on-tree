@@ -3,6 +3,7 @@
 /// Displays the application name, repository controls (Open, Refresh, Close),
 /// and a loading spinner when operations are in progress.
 use crabontree_app::AppMessage;
+use crabontree_ui_core::Theme;
 use eframe::egui;
 use std::path::PathBuf;
 
@@ -24,11 +25,14 @@ pub fn render(
     has_repo: bool,
     loading: bool,
     visible_panes: &[crate::panes::Pane],
+    available_themes: &[(String, Theme)],
     current_theme: &str,
 ) -> TopPanelAction {
     let mut action = TopPanelAction::None;
 
-    egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+    egui::TopBottomPanel::top("top_panel")
+        .frame(egui::Frame::side_top_panel(&ctx.style()).inner_margin(egui::Margin::symmetric(8.0, 5.0)))
+        .show(ctx, |ui| {
         ui.horizontal(|ui| {
             ui.heading("CrabOnTree");
 
@@ -104,18 +108,10 @@ pub fn render(
                 }
 
                 ui.menu_button("🎨 Theme", |ui| {
-                    let themes = [
-                        ("dark", "Dark (GitHub)"),
-                        ("light", "Light (GitHub)"),
-                        ("jetbrains", "JetBrains Darcula"),
-                        ("visual_studio", "Visual Studio Dark"),
-                    ];
-                    for (name, label) in themes {
-                        if ui
-                            .selectable_label(current_theme == name, label)
-                            .clicked()
-                        {
-                            action = TopPanelAction::SetTheme(name.to_string());
+                    for (id, theme) in available_themes {
+                        let label = if theme.name.is_empty() { id.as_str() } else { theme.name.as_str() };
+                        if ui.selectable_label(current_theme == id.as_str(), label).clicked() {
+                            action = TopPanelAction::SetTheme(id.clone());
                             ui.close_menu();
                         }
                     }

@@ -72,6 +72,15 @@ fn config_path() -> Option<PathBuf> {
         .map(|dirs| dirs.config_dir().join("config.toml"))
 }
 
+/// Get the user themes directory (`<config_dir>/themes/`).
+///
+/// Returns `None` if the platform config directory cannot be determined.
+/// The directory is not created automatically — callers should handle its absence.
+pub fn themes_dir() -> Option<PathBuf> {
+    ProjectDirs::from("com", "crabontree", "CrabOnTree")
+        .map(|dirs| dirs.config_dir().join("themes"))
+}
+
 /// Load configuration from disk, falling back to defaults on error.
 pub fn load_config() -> AppConfig {
     let Some(path) = config_path() else {

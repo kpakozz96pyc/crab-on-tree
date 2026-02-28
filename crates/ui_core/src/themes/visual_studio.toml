@@ -1,3 +1,5 @@
+name = "Visual Studio Dark"
+
 bg_primary   = "#1e1e1e"
 bg_secondary = "#252526"
 bg_tertiary  = "#2d2d30"

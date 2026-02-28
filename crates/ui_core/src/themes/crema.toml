@@ -1,0 +1,46 @@
+name = "Crema"
+
+# ── Backgrounds ───────────────────────────────────────────────────────────────
+# Main panel background
+bg_primary   = "#fdfcf8"   # мягкий тёплый белый
+
+# Secondary surface
+bg_secondary = "#f6f3ea"   # светлый кремовый
+
+# Tertiary surface
+bg_tertiary  = "#ebe7dc"   # hover / неактивные кнопки
+
+# ── Foreground ─────────────────────────────────────────────────────────────────
+fg_primary   = "#2a2a2a"   # чуть мягче, чем чистый чёрный
+fg_secondary = "#5f5a50"   # тёплый серо-коричневый
+fg_tertiary  = "#8a8478"
+
+# ── Accent ─────────────────────────────────────────────────────────────────────
+accent_primary   = "#1f6feb"   # спокойный синий
+accent_secondary = "#174ea6"   # более глубокий для selection
+
+# ── Semantic ──────────────────────────────────────────────────────────────────
+error   = "#c0392b"   # тёплый красный
+warning = "#b07a00"   # янтарный
+success = "#2e8b57"   # мягкий зелёный
+info    = "#1f6feb"
+
+# ── Git status icons ──────────────────────────────────────────────────────────
+git_added        = "#2e8b57"
+git_modified     = "#b07a00"
+git_deleted      = "#c0392b"
+git_untracked    = "#7a756b"
+git_branch       = "#1f6feb"
+git_renamed      = "#3b82f6"
+git_conflicted   = "#d9480f"
+git_type_changed = "#7c3aed"
+
+# ── UI structure ──────────────────────────────────────────────────────────────
+pane_border = "#d8d2c4"
+
+selection_fg = "#ffffff"
+
+overlay_bg = "#ffffffd9"   # полупрозрачный тёплый белый
+overlay_fg = "#2a2a2a"
+
+hint_fg = "#8a8478"

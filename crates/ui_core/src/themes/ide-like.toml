@@ -1,0 +1,45 @@
+# ── Backgrounds ───────────────────────────────────────────────────────────────
+# Main panel background
+bg_primary   = "#fbfaf6"   # очень светлый тёплый фон
+
+# Secondary surface
+bg_secondary = "#f2efe6"   # основной рабочий фон вкладок / dock
+
+# Tertiary surface (строки, hover, inactive fill)
+bg_tertiary  = "#e4dfd1"   # более выраженный для списков
+
+# ── Foreground ─────────────────────────────────────────────────────────────────
+fg_primary   = "#262626"
+fg_secondary = "#5c574d"
+fg_tertiary  = "#807a6e"
+
+# ── Accent ─────────────────────────────────────────────────────────────────────
+accent_primary   = "#1f6feb"
+accent_secondary = "#1a56c2"   # selection фон
+
+# ── Semantic ──────────────────────────────────────────────────────────────────
+error   = "#c0362c"
+warning = "#a97400"
+success = "#2f855a"
+info    = "#1f6feb"
+
+# ── Git status icons ──────────────────────────────────────────────────────────
+git_added        = "#2f855a"
+git_modified     = "#a97400"
+git_deleted      = "#c0362c"
+git_untracked    = "#6f6a5f"
+git_branch       = "#1f6feb"
+git_renamed      = "#2563eb"
+git_conflicted   = "#d9480f"
+git_type_changed = "#7c3aed"
+
+# ── UI structure ──────────────────────────────────────────────────────────────
+pane_border = "#d6d0c2"
+
+selection_fg = "#ffffff"
+
+# Overlay немного затемнён, чтобы loader ощущался "модальным"
+overlay_bg = "#f2efe6e6"
+overlay_fg = "#262626"
+
+hint_fg = "#807a6e"

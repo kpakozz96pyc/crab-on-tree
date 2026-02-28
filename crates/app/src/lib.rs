@@ -14,7 +14,7 @@ pub mod state;
 /// Special constant to represent the working directory as a virtual commit.
 pub const WORKING_DIR_HASH: &str = "WORKING_DIRECTORY";
 
-pub use config::{load_config, save_config, AppConfig, CommitDraft};
+pub use config::{load_config, save_config, themes_dir, AppConfig, CommitDraft};
 pub use crabontree_git::{
     Commit, DiffHunk, DiffLine, DiffLineType, FileDiff, FileStatus, WorkingDirFile,
     WorkingDirStatus,
