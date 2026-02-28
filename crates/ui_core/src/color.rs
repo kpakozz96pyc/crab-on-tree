@@ -1,14 +1,36 @@
 //! Color types and utilities.
 
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
-/// RGBA color representation.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+/// RGBA color representation, serialized as a hex string (`"#rrggbb"` / `"#rrggbbaa"`).
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Color {
     pub r: f32,
     pub g: f32,
     pub b: f32,
     pub a: f32,
+}
+
+impl Serialize for Color {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        let r = (self.r * 255.0).round() as u8;
+        let g = (self.g * 255.0).round() as u8;
+        let b = (self.b * 255.0).round() as u8;
+        let a = (self.a * 255.0).round() as u8;
+        if a == 255 {
+            s.serialize_str(&format!("#{:02x}{:02x}{:02x}", r, g, b))
+        } else {
+            s.serialize_str(&format!("#{:02x}{:02x}{:02x}{:02x}", r, g, b, a))
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Color {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(d)?;
+        Color::from_hex(&s)
+            .ok_or_else(|| de::Error::custom(format!("invalid hex color: {}", s)))
+    }
 }
 
 impl Color {

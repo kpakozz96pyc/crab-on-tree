@@ -13,9 +13,10 @@ pub enum TopPanelAction {
     RefreshRepo,
     CloseRepo,
     TogglePane(crate::panes::Pane),
+    SetTheme(String),
 }
 
-/// Renders the top panel toolbar. dfdad
+/// Renders the top panel toolbar.
 ///
 /// Returns an action that the caller should handle.
 pub fn render(
@@ -23,6 +24,7 @@ pub fn render(
     has_repo: bool,
     loading: bool,
     visible_panes: &[crate::panes::Pane],
+    current_theme: &str,
 ) -> TopPanelAction {
     let mut action = TopPanelAction::None;
 
@@ -94,11 +96,31 @@ pub fn render(
                 }
             }
 
-            // Loading spinner
-            if loading {
-                ui.add_space(10.0);
-                ui.spinner();
-            }
+            // Theme selector
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if loading {
+                    ui.spinner();
+                    ui.add_space(10.0);
+                }
+
+                ui.menu_button("🎨 Theme", |ui| {
+                    let themes = [
+                        ("dark", "Dark (GitHub)"),
+                        ("light", "Light (GitHub)"),
+                        ("jetbrains", "JetBrains Darcula"),
+                        ("visual_studio", "Visual Studio Dark"),
+                    ];
+                    for (name, label) in themes {
+                        if ui
+                            .selectable_label(current_theme == name, label)
+                            .clicked()
+                        {
+                            action = TopPanelAction::SetTheme(name.to_string());
+                            ui.close_menu();
+                        }
+                    }
+                });
+            });
         });
     });
 
@@ -112,6 +134,7 @@ pub fn action_to_message(action: &TopPanelAction) -> Option<AppMessage> {
         TopPanelAction::OpenRepo(path) => Some(AppMessage::OpenRepoRequested(path.clone())),
         TopPanelAction::RefreshRepo => Some(AppMessage::RefreshRepo),
         TopPanelAction::CloseRepo => Some(AppMessage::CloseRepo),
-        TopPanelAction::TogglePane(_) => None, // Handled separately in main.rs
+        TopPanelAction::TogglePane(_) => None, // Handled separately in lifecycle.rs
+        TopPanelAction::SetTheme(_) => None,   // Handled separately in lifecycle.rs
     }
 }

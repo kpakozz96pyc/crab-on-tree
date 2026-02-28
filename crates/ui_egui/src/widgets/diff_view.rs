@@ -3,6 +3,7 @@
 //! This widget handles the display of git diffs with proper syntax
 //! highlighting for additions, deletions, and context lines.
 
+use crate::utils::theme::ThemeColors;
 use crabontree_app::{DiffHunk, DiffLineType};
 use eframe::egui;
 use std::path::Path;
@@ -59,9 +60,11 @@ impl<'a> DiffView<'a> {
         for (line_idx, line) in hunk.lines.iter().enumerate() {
             ui.push_id(format!("line_{}", line_idx), |ui| {
                 let (prefix, color) = match line.line_type {
-                    DiffLineType::Addition => ("+", egui::Color32::from_rgb(0, 200, 0)),
-                    DiffLineType::Deletion => ("-", egui::Color32::from_rgb(200, 0, 0)),
-                    DiffLineType::Context => (" ", egui::Color32::from_rgb(200, 200, 200)),
+                    DiffLineType::Addition => ("+", ThemeColors::get(ui.ctx()).git_added),
+                    DiffLineType::Deletion => ("-", ui.visuals().error_fg_color),
+                    DiffLineType::Context => {
+                        (" ", ui.visuals().widgets.noninteractive.fg_stroke.color)
+                    }
                 };
 
                 ui.horizontal(|ui| {

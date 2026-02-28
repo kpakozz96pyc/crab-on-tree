@@ -1,0 +1,30 @@
+bg_primary   = "#282828"
+bg_secondary = "#2b2b2b"
+bg_tertiary  = "#3c3f41"
+
+fg_primary   = "#a9b7c6"
+fg_secondary = "#808080"
+fg_tertiary  = "#606366"
+
+accent_primary   = "#589df6"
+accent_secondary = "#4b6eaf"
+
+error   = "#bc3f3c"
+warning = "#ac7920"
+success = "#629755"
+info    = "#589df6"
+
+git_added        = "#629755"
+git_modified     = "#6897bb"
+git_deleted      = "#bc3f3c"
+git_untracked    = "#808080"
+git_branch       = "#589df6"
+git_renamed      = "#6897bb"
+git_conflicted   = "#bc3f3c"
+git_type_changed = "#9876aa"
+
+pane_border  = "#4b4b4b"
+selection_fg = "#ffffff"
+overlay_bg   = "#00000080"
+overlay_fg   = "#ffffff"
+hint_fg      = "#606366"

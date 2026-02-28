@@ -42,7 +42,7 @@ impl CrabOnTreeApp {
 
     pub(crate) fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         let config = load_config();
-        let theme = Theme::by_name(&config.theme).unwrap_or_else(Theme::dark);
+        let theme = Theme::by_name(&config.theme).unwrap_or_else(Theme::fallback);
         let (executor, message_rx) = JobExecutor::new();
 
         let dock_state = if let Some(layout_json) = &config.dock_layout {

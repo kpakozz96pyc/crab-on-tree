@@ -1,4 +1,7 @@
 //! Theme definitions for the application.
+//!
+//! Themes are stored as JSON files embedded at compile time.
+//! Use [`Theme::by_name`] to load a built-in theme by its identifier.
 
 use crate::Color;
 use serde::{Deserialize, Serialize};
@@ -32,70 +35,42 @@ pub struct Theme {
     pub git_deleted: Color,
     pub git_untracked: Color,
     pub git_branch: Color,
+    pub git_renamed: Color,
+    pub git_conflicted: Color,
+    pub git_type_changed: Color,
+
+    // UI structural colors
+    pub pane_border: Color,
+    pub selection_fg: Color,
+    pub overlay_bg: Color,
+    pub overlay_fg: Color,
+    pub hint_fg: Color,
 }
 
 impl Theme {
-    /// Get a theme by name.
+    /// Load a built-in theme by name.
+    ///
+    /// Built-in names: `"dark"`, `"light"`, `"jetbrains"`, `"visual_studio"`.
     pub fn by_name(name: &str) -> Option<Self> {
-        match name {
-            "dark" => Some(Self::dark()),
-            "light" => Some(Self::light()),
-            _ => None,
+        let toml = match name {
+            "dark" => include_str!("themes/dark.toml"),
+            "light" => include_str!("themes/light.toml"),
+            "jetbrains" => include_str!("themes/jetbrains.toml"),
+            "visual_studio" => include_str!("themes/visual_studio.toml"),
+            _ => return None,
+        };
+        match toml::from_str(toml) {
+            Ok(theme) => Some(theme),
+            Err(e) => {
+                eprintln!("Failed to parse built-in theme '{}': {}", name, e);
+                None
+            }
         }
     }
 
-    /// GitHub-inspired dark theme.
-    pub fn dark() -> Self {
-        Self {
-            bg_primary: Color::from_hex("#0d1117").unwrap(),
-            bg_secondary: Color::from_hex("#161b22").unwrap(),
-            bg_tertiary: Color::from_hex("#21262d").unwrap(),
-
-            fg_primary: Color::from_hex("#c9d1d9").unwrap(),
-            fg_secondary: Color::from_hex("#8b949e").unwrap(),
-            fg_tertiary: Color::from_hex("#6e7681").unwrap(),
-
-            accent_primary: Color::from_hex("#58a6ff").unwrap(),
-            accent_secondary: Color::from_hex("#1f6feb").unwrap(),
-
-            error: Color::from_hex("#f85149").unwrap(),
-            warning: Color::from_hex("#d29922").unwrap(),
-            success: Color::from_hex("#3fb950").unwrap(),
-            info: Color::from_hex("#58a6ff").unwrap(),
-
-            git_added: Color::from_hex("#3fb950").unwrap(),
-            git_modified: Color::from_hex("#d29922").unwrap(),
-            git_deleted: Color::from_hex("#f85149").unwrap(),
-            git_untracked: Color::from_hex("#8b949e").unwrap(),
-            git_branch: Color::from_hex("#58a6ff").unwrap(),
-        }
-    }
-
-    /// GitHub-inspired light theme.
-    pub fn light() -> Self {
-        Self {
-            bg_primary: Color::from_hex("#ffffff").unwrap(),
-            bg_secondary: Color::from_hex("#f6f8fa").unwrap(),
-            bg_tertiary: Color::from_hex("#eaeef2").unwrap(),
-
-            fg_primary: Color::from_hex("#24292e").unwrap(),
-            fg_secondary: Color::from_hex("#57606a").unwrap(),
-            fg_tertiary: Color::from_hex("#6e7781").unwrap(),
-
-            accent_primary: Color::from_hex("#0969da").unwrap(),
-            accent_secondary: Color::from_hex("#0550ae").unwrap(),
-
-            error: Color::from_hex("#cf222e").unwrap(),
-            warning: Color::from_hex("#9a6700").unwrap(),
-            success: Color::from_hex("#1a7f37").unwrap(),
-            info: Color::from_hex("#0969da").unwrap(),
-
-            git_added: Color::from_hex("#1a7f37").unwrap(),
-            git_modified: Color::from_hex("#9a6700").unwrap(),
-            git_deleted: Color::from_hex("#cf222e").unwrap(),
-            git_untracked: Color::from_hex("#57606a").unwrap(),
-            git_branch: Color::from_hex("#0969da").unwrap(),
-        }
+    /// Returns a hard-coded dark theme as a last-resort fallback.
+    pub fn fallback() -> Self {
+        Self::by_name("dark").expect("built-in dark theme must always parse")
     }
 }
 
@@ -107,6 +82,18 @@ mod tests {
     fn test_theme_by_name() {
         assert!(Theme::by_name("dark").is_some());
         assert!(Theme::by_name("light").is_some());
+        assert!(Theme::by_name("jetbrains").is_some());
+        assert!(Theme::by_name("visual_studio").is_some());
         assert!(Theme::by_name("invalid").is_none());
+    }
+
+    #[test]
+    fn test_all_themes_have_pane_border() {
+        for name in ["dark", "light", "jetbrains", "visual_studio"] {
+            let theme = Theme::by_name(name).unwrap();
+            // pane_border must be a valid, non-zero color
+            let c = theme.pane_border;
+            assert!(c.r >= 0.0 && c.r <= 1.0, "{name}: pane_border.r out of range");
+        }
     }
 }

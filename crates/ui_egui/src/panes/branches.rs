@@ -1,3 +1,4 @@
+use crate::utils::theme::ThemeColors;
 use crabontree_app::{AppMessage, BranchTreeState};
 use eframe::egui;
 
@@ -189,10 +190,11 @@ pub fn render(ui: &mut egui::Ui, branch_tree: &BranchTreeState, loading: bool) -
 
     // Draw loading overlay if loading
     if loading {
+        let tc = ThemeColors::get(ui.ctx());
         let painter = ui.painter();
 
         // Draw semi-transparent overlay
-        painter.rect_filled(pane_rect, 0.0, egui::Color32::from_black_alpha(128));
+        painter.rect_filled(pane_rect, 0.0, tc.overlay_bg);
 
         // Draw spinner and text in the center
         let center = pane_rect.center();
@@ -204,7 +206,7 @@ pub fn render(ui: &mut egui::Ui, branch_tree: &BranchTreeState, loading: bool) -
                 ui.spinner();
                 ui.label(
                     egui::RichText::new("Switching branch...")
-                        .color(egui::Color32::WHITE)
+                        .color(tc.overlay_fg)
                         .strong(),
                 );
             });

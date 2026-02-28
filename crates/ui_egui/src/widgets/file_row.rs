@@ -4,6 +4,7 @@
 //! eliminating the duplication of status icon logic across multiple
 //! sections (staged, unstaged, untracked, conflicted).
 
+use crate::utils::theme::ThemeColors;
 use crabontree_app::WorkingDirStatus;
 use eframe::egui;
 use std::path::Path;
@@ -38,7 +39,7 @@ impl<'a> FileRow<'a> {
 
     /// Renders the file row and returns the interaction type and the row's egui Response.
     pub fn render(self, ui: &mut egui::Ui) -> (FileRowInteraction, egui::Response) {
-        let (status_icon, status_color) = self.get_status_info();
+        let (status_icon, status_color) = self.get_status_info(ui);
 
         let row = ui.horizontal(|ui| {
             ui.set_min_width(ui.available_width());
@@ -60,14 +61,15 @@ impl<'a> FileRow<'a> {
     }
 
     /// Gets the status icon and color for the current file status.
-    fn get_status_info(&self) -> (&'static str, egui::Color32) {
+    fn get_status_info(&self, ui: &egui::Ui) -> (&'static str, egui::Color32) {
+        let tc = ThemeColors::get(ui.ctx());
         match self.status {
-            WorkingDirStatus::Modified => ("~", egui::Color32::from_rgb(200, 150, 0)),
-            WorkingDirStatus::Deleted => ("-", egui::Color32::from_rgb(200, 0, 0)),
-            WorkingDirStatus::Untracked => ("+", egui::Color32::from_rgb(0, 200, 0)),
-            WorkingDirStatus::Renamed => ("R", egui::Color32::from_rgb(100, 150, 200)),
-            WorkingDirStatus::Conflicted => ("!", egui::Color32::from_rgb(200, 0, 200)),
-            WorkingDirStatus::TypeChanged => ("T", egui::Color32::from_rgb(150, 100, 200)),
+            WorkingDirStatus::Modified => ("~", ui.visuals().warn_fg_color),
+            WorkingDirStatus::Deleted => ("-", ui.visuals().error_fg_color),
+            WorkingDirStatus::Untracked => ("+", tc.git_untracked),
+            WorkingDirStatus::Renamed => ("R", tc.git_renamed),
+            WorkingDirStatus::Conflicted => ("!", tc.git_conflicted),
+            WorkingDirStatus::TypeChanged => ("T", tc.git_type_changed),
         }
     }
 }

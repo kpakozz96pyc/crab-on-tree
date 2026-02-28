@@ -1,0 +1,86 @@
+# ── Backgrounds ───────────────────────────────────────────────────────────────
+
+# Main panel background: TopBottomPanel, SidePanel, CentralPanel, noninteractive widget fill
+bg_primary   = "#0d1117"
+
+# Secondary surface: egui_dock tab body, popups, windows, TextEdit/ScrollArea inner bg
+bg_secondary = "#161b22"
+
+# Tertiary surface: subtle row highlights, inactive button fill, hover base, open-menu fill
+bg_tertiary  = "#21262d"
+
+# ── Foreground ─────────────────────────────────────────────────────────────────
+
+# Primary text: all widget labels, static text (noninteractive/inactive/hovered/active fg_stroke)
+fg_primary   = "#c9d1d9"
+
+# Secondary text: available for custom use (e.g., dimmer metadata)
+fg_secondary = "#8b949e"
+
+# Tertiary text: used as hint_fg fallback; see hint_fg below
+fg_tertiary  = "#6e7681"
+
+# ── Accent ─────────────────────────────────────────────────────────────────────
+
+# Primary accent: hyperlinks, hover/open border stroke, focus ring
+accent_primary   = "#58a6ff"
+
+# Secondary accent: selection highlight background (selected commit/file row), pressed button fill
+accent_secondary = "#1f6feb"
+
+# ── Semantic ──────────────────────────────────────────────────────────────────
+
+# Error colour: deleted-file "−" icon, diff deletion lines
+error   = "#f85149"
+
+# Warning colour: modified-file "~" icon
+warning = "#d29922"
+
+# Success colour: available for custom use
+success = "#3fb950"
+
+# Info colour: available for custom use
+info    = "#58a6ff"
+
+# ── Git status icons ──────────────────────────────────────────────────────────
+
+# Staged/added file "+" prefix; diff addition lines
+git_added    = "#3fb950"
+
+# Modified-file colour (mirrors warning; available for custom widgets)
+git_modified = "#d29922"
+
+# Deleted-file colour (mirrors error; available for custom widgets)
+git_deleted  = "#f85149"
+
+# Untracked-file "+" icon in the Changed Files pane
+git_untracked    = "#8b949e"
+
+# Branch name labels in the Branches pane
+git_branch       = "#58a6ff"
+
+# Renamed-file "R" icon in the Changed Files pane
+git_renamed      = "#79c0ff"
+
+# Conflicted-file "!" icon in the Changed Files pane
+git_conflicted   = "#ff7b72"
+
+# Type-changed-file "T" icon in the Changed Files pane
+git_type_changed = "#d2a8ff"
+
+# ── UI structure ──────────────────────────────────────────────────────────────
+
+# Pane/window border lines (noninteractive bg_stroke, window_stroke)
+pane_border = "#30363d"
+
+# Text colour drawn on top of the selection highlight (accent_secondary background)
+selection_fg = "#ffffff"
+
+# Loading-overlay background in Branches and Changed Files panes (supports alpha via #rrggbbaa)
+overlay_bg = "#00000080"
+
+# Text/spinner label colour drawn on top of the loading overlay
+overlay_fg = "#ffffff"
+
+# Placeholder text in the commit Summary and Description fields
+hint_fg = "#6e7681"

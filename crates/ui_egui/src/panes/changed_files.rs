@@ -1,3 +1,4 @@
+use crate::utils::theme::ThemeColors;
 use crate::widgets::{render_with_bottom_panel, FileRow, FileRowInteraction};
 use crabontree_app::{AppMessage, ChangedFilesState};
 use eframe::egui;
@@ -232,7 +233,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                         .desired_width(f32::INFINITY)
                         .hint_text(
                             egui::RichText::new("Commit summary")
-                                .color(egui::Color32::from_gray(80)),
+                                .color(ThemeColors::get(ui.ctx()).hint_fg),
                         ),
                 );
                 if summary_response.changed() {
@@ -250,7 +251,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                         .desired_rows(3)
                         .hint_text(
                             egui::RichText::new("Optional description")
-                                .color(egui::Color32::from_gray(80)),
+                                .color(ThemeColors::get(ui.ctx()).hint_fg),
                         ),
                 );
                 if description_response.changed() {
@@ -294,8 +295,9 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
 
                 // Loading overlay
                 if loading {
+                    let tc = ThemeColors::get(ui.ctx());
                     let painter = ui.painter();
-                    painter.rect_filled(panel_rect, 0.0, egui::Color32::from_black_alpha(128));
+                    painter.rect_filled(panel_rect, 0.0, tc.overlay_bg);
 
                     let spinner_rect =
                         egui::Rect::from_center_size(panel_rect.center(), egui::vec2(100.0, 50.0));
@@ -305,7 +307,7 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                             ui.spinner();
                             ui.label(
                                 egui::RichText::new("Committing...")
-                                    .color(egui::Color32::WHITE)
+                                    .color(tc.overlay_fg)
                                     .strong(),
                             );
                         });
