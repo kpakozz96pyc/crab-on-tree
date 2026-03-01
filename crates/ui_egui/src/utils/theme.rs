@@ -80,11 +80,21 @@ pub fn apply_theme(ctx: &egui::Context, theme: &Theme) {
     visuals.faint_bg_color = bg_tertiary; // subtle row highlights
     visuals.code_bg_color = bg_secondary;
 
+    let rounding = if theme.rounded_corners {
+        egui::Rounding::same(6.0)
+    } else {
+        egui::Rounding::ZERO
+    };
+
+    visuals.window_rounding = rounding;
+    visuals.menu_rounding = rounding;
+
     // ── Widget visuals ───────────────────────────────────────────────────────
     // noninteractive: labels, separators, static frames
     visuals.widgets.noninteractive.bg_fill = bg_primary;
     visuals.widgets.noninteractive.weak_bg_fill = bg_secondary;
     visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0, pane_border);
+    visuals.widgets.noninteractive.rounding = rounding;
     // fg_stroke is used both as the text colour and as the fallback inside text_color(),
     // so use fg_primary here (not fg_secondary) to keep static labels readable.
     visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, fg_primary);
@@ -93,24 +103,28 @@ pub fn apply_theme(ctx: &egui::Context, theme: &Theme) {
     visuals.widgets.inactive.bg_fill = bg_tertiary;
     visuals.widgets.inactive.weak_bg_fill = bg_secondary;
     visuals.widgets.inactive.bg_stroke = egui::Stroke::new(1.0, bg_tertiary);
+    visuals.widgets.inactive.rounding = rounding;
     visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, fg_primary);
 
     // hovered
     visuals.widgets.hovered.bg_fill = bg_hover;
     visuals.widgets.hovered.weak_bg_fill = bg_tertiary;
     visuals.widgets.hovered.bg_stroke = egui::Stroke::new(1.5, accent);
+    visuals.widgets.hovered.rounding = rounding;
     visuals.widgets.hovered.fg_stroke = egui::Stroke::new(1.5, fg_primary);
 
     // active (pressed)
     visuals.widgets.active.bg_fill = accent2;
     visuals.widgets.active.weak_bg_fill = accent2;
     visuals.widgets.active.bg_stroke = egui::Stroke::new(1.0, accent);
+    visuals.widgets.active.rounding = rounding;
     visuals.widgets.active.fg_stroke = egui::Stroke::new(2.0, fg_primary);
 
     // open (open combo boxes, collapsing headers)
     visuals.widgets.open.bg_fill = bg_tertiary;
     visuals.widgets.open.weak_bg_fill = bg_secondary;
     visuals.widgets.open.bg_stroke = egui::Stroke::new(1.0, accent);
+    visuals.widgets.open.rounding = rounding;
     visuals.widgets.open.fg_stroke = egui::Stroke::new(1.5, fg_primary);
 
     // ── Selection ────────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 name = "Dark (GitHub)"
+rounded_corners = false
 
 # ── Backgrounds ───────────────────────────────────────────────────────────────
 
@@ -86,3 +87,6 @@ overlay_fg = "#ffffff"
 
 # Placeholder text in the commit Summary and Description fields
 hint_fg = "#6e7681"
+
+# Background when no repository is open (welcome screen)
+startup_bg = "#0d1117"

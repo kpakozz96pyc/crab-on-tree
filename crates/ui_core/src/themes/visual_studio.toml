@@ -1,4 +1,5 @@
 name = "Visual Studio Dark"
+rounded_corners = false
 
 bg_primary   = "#1e1e1e"
 bg_secondary = "#252526"
@@ -30,3 +31,4 @@ selection_fg = "#ffffff"
 overlay_bg   = "#00000080"
 overlay_fg   = "#ffffff"
 hint_fg      = "#656565"
+startup_bg   = "#1e1e1e"

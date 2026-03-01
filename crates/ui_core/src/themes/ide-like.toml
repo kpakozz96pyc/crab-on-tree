@@ -1,3 +1,5 @@
+rounded_corners = true
+
 # ── Backgrounds ───────────────────────────────────────────────────────────────
 # Main panel background
 bg_primary   = "#fbfaf6"   # очень светлый тёплый фон
@@ -43,3 +45,4 @@ overlay_bg = "#f2efe6e6"
 overlay_fg = "#262626"
 
 hint_fg = "#807a6e"
+startup_bg = "#f6f1e5"

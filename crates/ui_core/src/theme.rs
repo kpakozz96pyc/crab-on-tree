@@ -24,6 +24,12 @@ pub struct Theme {
     #[serde(default)]
     pub name: String,
 
+    /// Whether UI chrome should use rounded corners.
+    ///
+    /// Defaults to `false` for backward compatibility with existing theme files.
+    #[serde(default)]
+    pub rounded_corners: bool,
+
     // Background colors
     pub bg_primary: Color,
     pub bg_secondary: Color,
@@ -60,6 +66,12 @@ pub struct Theme {
     pub overlay_bg: Color,
     pub overlay_fg: Color,
     pub hint_fg: Color,
+
+    /// Startup/welcome background color used when no repository is open.
+    ///
+    /// If omitted, UI falls back to `bg_primary`.
+    #[serde(default)]
+    pub startup_bg: Option<Color>,
 }
 
 impl Theme {

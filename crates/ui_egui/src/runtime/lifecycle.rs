@@ -79,8 +79,15 @@ impl eframe::App for CrabOnTreeApp {
             }
         }
 
+        let startup_bg = self.theme.startup_bg.unwrap_or(self.theme.bg_primary);
+        let central_fill = if self.state.current_repo.is_some() {
+            theme::color_to_egui(self.theme.bg_primary)
+        } else {
+            theme::color_to_egui(startup_bg)
+        };
+
         egui::CentralPanel::default()
-            .frame(egui::Frame::none())
+            .frame(egui::Frame::none().fill(central_fill))
             .show(ctx, |ui| {
                 if self.state.current_repo.is_some() {
                     self.render_repository_view(ui);

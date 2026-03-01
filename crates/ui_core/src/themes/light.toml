@@ -1,4 +1,5 @@
 name = "Light (GitHub)"
+rounded_corners = true
 
 bg_primary   = "#ffffff"
 bg_secondary = "#f6f8fa"
@@ -30,3 +31,4 @@ selection_fg = "#ffffff"
 overlay_bg   = "#00000080"
 overlay_fg   = "#ffffff"
 hint_fg      = "#6e7781"
+startup_bg   = "#f3f6fa"

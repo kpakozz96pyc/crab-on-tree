@@ -29,9 +29,10 @@ pub fn selectable_row(
             egui::Color32::TRANSPARENT
         };
 
-        // Paint background if needed with rounded corners
+        // Paint background if needed.
         if bg_color != egui::Color32::TRANSPARENT {
-            ui.painter().rect_filled(rect, 2.0, bg_color);
+            ui.painter()
+                .rect_filled(rect, ui.visuals().widgets.inactive.rounding, bg_color);
         }
 
         // Paint text left-aligned
