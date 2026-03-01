@@ -49,10 +49,22 @@ pub enum Job {
         file_path: PathBuf,
     },
 
+    /// Stage multiple files.
+    StageFiles {
+        repo_path: PathBuf,
+        file_paths: Vec<PathBuf>,
+    },
+
     /// Unstage a file.
     UnstageFile {
         repo_path: PathBuf,
         file_path: PathBuf,
+    },
+
+    /// Unstage multiple files.
+    UnstageFiles {
+        repo_path: PathBuf,
+        file_paths: Vec<PathBuf>,
     },
 
     /// Stage all changes.

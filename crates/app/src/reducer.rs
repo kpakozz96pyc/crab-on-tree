@@ -3,6 +3,7 @@
 mod branch_handlers;
 mod commit_handlers;
 mod file_handlers;
+mod helpers;
 mod repo_handlers;
 
 use crate::{AppMessage, AppState, Effect};

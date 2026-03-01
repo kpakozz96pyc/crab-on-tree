@@ -171,6 +171,7 @@ pub(super) async fn execute_load_multiple_file_diffs(
     .context("Task panicked")??;
 
     Ok(AppMessage::MultipleFileDiffsLoaded {
+        selected_paths: file_paths,
         files: files_with_diffs,
     })
 }

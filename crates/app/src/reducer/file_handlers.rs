@@ -1,3 +1,7 @@
+use super::helpers::file_selection::{
+    collect_files_to_stage, collect_files_to_unstage, should_apply_multi_file_result,
+    should_apply_single_file_result,
+};
 use crate::{AppMessage, AppState, Effect};
 
 pub(super) fn handle(state: &mut AppState, msg: AppMessage) -> Effect {
@@ -170,26 +174,14 @@ pub(super) fn handle(state: &mut AppState, msg: AppMessage) -> Effect {
         AppMessage::StageSelectedFilesRequested => {
             if let Some(repo) = &state.current_repo {
                 if let Some(files) = &repo.changed_files {
-                    let files_to_stage: Vec<_> = files
-                        .selected_files
-                        .iter()
-                        .filter(|path| {
-                            files.unstaged.iter().any(|f| &f.path == *path)
-                                || files.untracked.iter().any(|f| &f.path == *path)
-                        })
-                        .cloned()
-                        .collect();
+                    let files_to_stage = collect_files_to_stage(files);
 
                     if !files_to_stage.is_empty() {
                         state.loading = true;
-                        let effects: Vec<_> = files_to_stage
-                            .into_iter()
-                            .map(|path| Effect::StageFile {
-                                repo_path: repo.path.clone(),
-                                file_path: path,
-                            })
-                            .collect();
-                        return Effect::Batch(effects);
+                        return Effect::StageFiles {
+                            repo_path: repo.path.clone(),
+                            file_paths: files_to_stage,
+                        };
                     }
                 }
             }
@@ -199,23 +191,14 @@ pub(super) fn handle(state: &mut AppState, msg: AppMessage) -> Effect {
         AppMessage::UnstageSelectedFilesRequested => {
             if let Some(repo) = &state.current_repo {
                 if let Some(files) = &repo.changed_files {
-                    let files_to_unstage: Vec<_> = files
-                        .selected_files
-                        .iter()
-                        .filter(|path| files.staged.iter().any(|f| &f.path == *path))
-                        .cloned()
-                        .collect();
+                    let files_to_unstage = collect_files_to_unstage(files);
 
                     if !files_to_unstage.is_empty() {
                         state.loading = true;
-                        let effects: Vec<_> = files_to_unstage
-                            .into_iter()
-                            .map(|path| Effect::UnstageFile {
-                                repo_path: repo.path.clone(),
-                                file_path: path,
-                            })
-                            .collect();
-                        return Effect::Batch(effects);
+                        return Effect::UnstageFiles {
+                            repo_path: repo.path.clone(),
+                            file_paths: files_to_unstage,
+                        };
                     }
                 }
             }
@@ -241,11 +224,13 @@ pub(super) fn handle(state: &mut AppState, msg: AppMessage) -> Effect {
         } => {
             state.loading = false;
             if let Some(repo) = &mut state.current_repo {
-                repo.file_view = crate::state::FileViewState::Content {
-                    path,
-                    content,
-                    language,
-                };
+                if should_apply_single_file_result(repo.changed_files.as_ref(), &path) {
+                    repo.file_view = crate::state::FileViewState::Content {
+                        path,
+                        content,
+                        language,
+                    };
+                }
             }
             Effect::None
         }
@@ -265,22 +250,29 @@ pub(super) fn handle(state: &mut AppState, msg: AppMessage) -> Effect {
         AppMessage::FileDiffLoaded { path, hunks } => {
             state.loading = false;
             if let Some(repo) = &mut state.current_repo {
-                repo.file_view = crate::state::FileViewState::Diff {
-                    path,
-                    hunks,
-                    view_mode: crate::state::DiffViewMode::Unified,
-                };
+                if should_apply_single_file_result(repo.changed_files.as_ref(), &path) {
+                    repo.file_view = crate::state::FileViewState::Diff {
+                        path,
+                        hunks,
+                        view_mode: crate::state::DiffViewMode::Unified,
+                    };
+                }
             }
             Effect::None
         }
 
-        AppMessage::MultipleFileDiffsLoaded { files } => {
+        AppMessage::MultipleFileDiffsLoaded {
+            selected_paths,
+            files,
+        } => {
             state.loading = false;
             if let Some(repo) = &mut state.current_repo {
-                repo.file_view = crate::state::FileViewState::MultipleDiffs {
-                    files,
-                    view_mode: crate::state::DiffViewMode::Unified,
-                };
+                if should_apply_multi_file_result(repo.changed_files.as_ref(), &selected_paths) {
+                    repo.file_view = crate::state::FileViewState::MultipleDiffs {
+                        files,
+                        view_mode: crate::state::DiffViewMode::Unified,
+                    };
+                }
             }
             Effect::None
         }
@@ -288,7 +280,9 @@ pub(super) fn handle(state: &mut AppState, msg: AppMessage) -> Effect {
         AppMessage::BinaryFileDetected { path, size } => {
             state.loading = false;
             if let Some(repo) = &mut state.current_repo {
-                repo.file_view = crate::state::FileViewState::Binary { path, size };
+                if should_apply_single_file_result(repo.changed_files.as_ref(), &path) {
+                    repo.file_view = crate::state::FileViewState::Binary { path, size };
+                }
             }
             Effect::None
         }

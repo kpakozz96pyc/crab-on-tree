@@ -110,6 +110,38 @@ pub(super) async fn execute_unstage_file(
     Ok(AppMessage::StagingCompleted)
 }
 
+/// Execute the StageFiles job.
+#[instrument(skip(repo_path, file_paths))]
+pub(super) async fn execute_stage_files(
+    repo_path: PathBuf,
+    file_paths: Vec<PathBuf>,
+) -> anyhow::Result<AppMessage> {
+    run_repo_job(repo_path, move |repo| {
+        repo.stage_files_batch(&file_paths)
+            .context("Failed to stage selected files")?;
+        Ok(())
+    })
+    .await?;
+
+    Ok(AppMessage::StagingCompleted)
+}
+
+/// Execute the UnstageFiles job.
+#[instrument(skip(repo_path, file_paths))]
+pub(super) async fn execute_unstage_files(
+    repo_path: PathBuf,
+    file_paths: Vec<PathBuf>,
+) -> anyhow::Result<AppMessage> {
+    run_repo_job(repo_path, move |repo| {
+        repo.unstage_files_batch(&file_paths)
+            .context("Failed to unstage selected files")?;
+        Ok(())
+    })
+    .await?;
+
+    Ok(AppMessage::StagingCompleted)
+}
+
 /// Execute the StageAll job.
 #[instrument(skip(path))]
 pub(super) async fn execute_stage_all(path: PathBuf) -> anyhow::Result<AppMessage> {

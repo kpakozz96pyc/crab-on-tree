@@ -201,6 +201,7 @@ pub enum AppMessage {
 
     /// Multiple file diffs were loaded.
     MultipleFileDiffsLoaded {
+        selected_paths: Vec<PathBuf>,
         files: Vec<(PathBuf, Vec<DiffHunk>)>,
     },
 

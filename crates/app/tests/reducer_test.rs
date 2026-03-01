@@ -1,11 +1,20 @@
 //! Tests for the state reducer.
 
-use crabontree_app::{reduce, AppMessage, AppState, Effect, RepoState};
-use crabontree_git::StatusSummary;
+use crabontree_app::{reduce, AppMessage, AppState, ChangedFilesState, Effect, RepoState};
+use crabontree_git::{DiffHunk, StatusSummary, WorkingDirFile, WorkingDirStatus};
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 fn default_state() -> AppState {
     AppState::default()
+}
+
+fn changed_file(path: &str, is_staged: bool, status: WorkingDirStatus) -> WorkingDirFile {
+    WorkingDirFile {
+        path: PathBuf::from(path),
+        status,
+        is_staged,
+    }
 }
 
 #[test]
@@ -205,4 +214,96 @@ fn test_max_recent_repos() {
 
     // Should only keep the last 3
     assert_eq!(state.config.recent_repos.len(), 3);
+}
+
+#[test]
+fn test_stage_selected_files_uses_batch_effect() {
+    let mut state = default_state();
+    let mut repo = RepoState::new(
+        PathBuf::from("/test/repo"),
+        "main".to_string(),
+        vec!["main".to_string()],
+        StatusSummary::default(),
+    );
+
+    let mut selected = HashSet::new();
+    selected.insert(PathBuf::from("src/a.rs"));
+    selected.insert(PathBuf::from("src/b.rs"));
+
+    repo.changed_files = Some(ChangedFilesState {
+        staged: vec![],
+        unstaged: vec![changed_file("src/a.rs", false, WorkingDirStatus::Modified)],
+        untracked: vec![changed_file("src/b.rs", false, WorkingDirStatus::Untracked)],
+        conflicted: vec![],
+        selected_file: Some(PathBuf::from("src/a.rs")),
+        selected_files: selected,
+        last_clicked_file: Some(PathBuf::from("src/a.rs")),
+        commit_message: String::new(),
+        is_commit_view: false,
+        commit_info: None,
+        commit_summary: String::new(),
+        commit_description: String::new(),
+        amend_last_commit: false,
+        push_after_commit: false,
+    });
+    state.current_repo = Some(repo);
+
+    let effect = reduce(&mut state, AppMessage::StageSelectedFilesRequested);
+    assert!(state.loading);
+    match effect {
+        Effect::StageFiles {
+            repo_path,
+            file_paths,
+        } => {
+            assert_eq!(repo_path, PathBuf::from("/test/repo"));
+            assert_eq!(file_paths.len(), 2);
+        }
+        other => panic!("Expected Effect::StageFiles, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_stale_file_diff_result_is_ignored() {
+    let mut state = default_state();
+    let mut repo = RepoState::new(
+        PathBuf::from("/test/repo"),
+        "main".to_string(),
+        vec!["main".to_string()],
+        StatusSummary::default(),
+    );
+
+    let mut selected = HashSet::new();
+    selected.insert(PathBuf::from("new.rs"));
+
+    repo.changed_files = Some(ChangedFilesState {
+        staged: vec![],
+        unstaged: vec![changed_file("new.rs", false, WorkingDirStatus::Modified)],
+        untracked: vec![],
+        conflicted: vec![],
+        selected_file: Some(PathBuf::from("new.rs")),
+        selected_files: selected,
+        last_clicked_file: Some(PathBuf::from("new.rs")),
+        commit_message: String::new(),
+        is_commit_view: false,
+        commit_info: None,
+        commit_summary: String::new(),
+        commit_description: String::new(),
+        amend_last_commit: false,
+        push_after_commit: false,
+    });
+    state.current_repo = Some(repo);
+
+    reduce(
+        &mut state,
+        AppMessage::FileDiffLoaded {
+            path: PathBuf::from("old.rs"),
+            hunks: Vec::<DiffHunk>::new(),
+        },
+    );
+
+    let repo = state.current_repo.as_ref().unwrap();
+    assert!(matches!(
+        repo.file_view,
+        crabontree_app::FileViewState::None
+    ));
 }

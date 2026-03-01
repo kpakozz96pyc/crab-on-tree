@@ -85,10 +85,18 @@ fn worker_thread(
                     repo_path,
                     file_path,
                 } => execute_stage_file(repo_path, file_path).await,
+                Job::StageFiles {
+                    repo_path,
+                    file_paths,
+                } => execute_stage_files(repo_path, file_paths).await,
                 Job::UnstageFile {
                     repo_path,
                     file_path,
                 } => execute_unstage_file(repo_path, file_path).await,
+                Job::UnstageFiles {
+                    repo_path,
+                    file_paths,
+                } => execute_unstage_files(repo_path, file_paths).await,
                 Job::StageAll(path) => execute_stage_all(path).await,
                 Job::UnstageAll(path) => execute_unstage_all(path).await,
                 Job::CreateCommit {
