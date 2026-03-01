@@ -64,9 +64,8 @@ pub(super) fn handle(state: &mut AppState, msg: AppMessage) -> Effect {
 
                     let found_commit = repo.commits.iter().find(|c| c.hash == commit_hash);
 
-                    let commit_message = found_commit
-                        .map(|c| c.message.clone())
-                        .unwrap_or_default();
+                    let commit_message =
+                        found_commit.map(|c| c.message.clone()).unwrap_or_default();
 
                     let commit_info = found_commit.map(|c| {
                         let branches = repo

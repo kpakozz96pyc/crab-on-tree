@@ -74,10 +74,10 @@ pub fn apply_theme(ctx: &egui::Context, theme: &Theme) {
     let bg_hover = blend(bg_tertiary, accent, 0.08);
 
     // ── Backgrounds ─────────────────────────────────────────────────────────
-    visuals.panel_fill = bg_primary;       // TopBottomPanel, SidePanel, CentralPanel
-    visuals.window_fill = bg_secondary;    // egui_dock tab body, popups, windows
+    visuals.panel_fill = bg_primary; // TopBottomPanel, SidePanel, CentralPanel
+    visuals.window_fill = bg_secondary; // egui_dock tab body, popups, windows
     visuals.extreme_bg_color = bg_secondary; // TextEdit, ScrollArea inner bg
-    visuals.faint_bg_color = bg_tertiary;  // subtle row highlights
+    visuals.faint_bg_color = bg_tertiary; // subtle row highlights
     visuals.code_bg_color = bg_secondary;
 
     // ── Widget visuals ───────────────────────────────────────────────────────

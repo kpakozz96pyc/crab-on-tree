@@ -1,10 +1,20 @@
 //! Theme definitions for the application.
 //!
-//! Themes are stored as JSON files embedded at compile time.
+//! Themes are stored as TOML files embedded at compile time.
 //! Use [`Theme::by_name`] to load a built-in theme by its identifier.
 
 use crate::Color;
 use serde::{Deserialize, Serialize};
+
+const BUILTIN_THEMES: &[(&str, &str)] = &[
+    ("dark", include_str!("themes/dark.toml")),
+    ("light", include_str!("themes/light.toml")),
+    ("high_contrast", include_str!("themes/high_contrast.toml")),
+    ("jetbrains", include_str!("themes/jetbrains.toml")),
+    ("visual_studio", include_str!("themes/visual_studio.toml")),
+    ("crema", include_str!("themes/crema.toml")),
+    ("ide-like", include_str!("themes/ide-like.toml")),
+];
 
 /// Application theme.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,19 +63,18 @@ pub struct Theme {
 }
 
 impl Theme {
+    /// Returns identifiers of built-in themes.
+    pub fn builtin_theme_ids() -> impl Iterator<Item = &'static str> {
+        BUILTIN_THEMES.iter().map(|(id, _)| *id)
+    }
+
     /// Load a built-in theme by name.
     ///
-    /// Built-in names: `"dark"`, `"light"`, `"jetbrains"`, `"visual_studio"`.
+    /// Built-in names are exposed via [`Theme::builtin_theme_ids`].
     pub fn by_name(name: &str) -> Option<Self> {
-        let toml = match name {
-            "dark" => include_str!("themes/dark.toml"),
-            "light" => include_str!("themes/light.toml"),
-            "jetbrains" => include_str!("themes/jetbrains.toml"),
-            "visual_studio" => include_str!("themes/visual_studio.toml"),
-            "crema" => include_str!("themes/crema.toml"),
-            "ide-like" => include_str!("themes/ide-like.toml"),
-            _ => return None,
-        };
+        let toml = BUILTIN_THEMES
+            .iter()
+            .find_map(|(id, toml)| (*id == name).then_some(*toml))?;
         match toml::from_str(toml) {
             Ok(theme) => Some(theme),
             Err(e) => {
@@ -87,16 +96,18 @@ mod tests {
 
     #[test]
     fn test_theme_by_name() {
-        assert!(Theme::by_name("dark").is_some());
-        assert!(Theme::by_name("light").is_some());
-        assert!(Theme::by_name("jetbrains").is_some());
-        assert!(Theme::by_name("visual_studio").is_some());
+        for name in Theme::builtin_theme_ids() {
+            assert!(
+                Theme::by_name(name).is_some(),
+                "missing built-in theme: {name}"
+            );
+        }
         assert!(Theme::by_name("invalid").is_none());
     }
 
     #[test]
     fn test_all_themes_have_pane_border() {
-        for name in ["dark", "light", "jetbrains", "visual_studio"] {
+        for name in Theme::builtin_theme_ids() {
             let theme = Theme::by_name(name).unwrap();
             // pane_border must be a valid, non-zero color
             let c = theme.pane_border;

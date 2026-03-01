@@ -43,7 +43,10 @@ pub fn render(ui: &mut egui::Ui, info: &CommitInfo, commit_message: &str) {
     if info.branches.is_empty() {
         ui.label(egui::RichText::new("Contained in no branch").weak());
     } else {
-        ui.label(format!("Contained in branches: {}", info.branches.join(", ")));
+        ui.label(format!(
+            "Contained in branches: {}",
+            info.branches.join(", ")
+        ));
     }
     if info.tags.is_empty() {
         ui.label(egui::RichText::new("Contained in no tag").weak());

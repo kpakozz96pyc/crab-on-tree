@@ -1,0 +1,35 @@
+name = "High Contrast"
+
+# Pure dark surfaces for maximum foreground contrast.
+bg_primary   = "#000000"
+bg_secondary = "#0a0a0a"
+bg_tertiary  = "#141414"
+
+# Very bright text against dark backgrounds.
+fg_primary   = "#ffffff"
+fg_secondary = "#e6e6e6"
+fg_tertiary  = "#cccccc"
+
+# Bright cyan/yellow accents with strong distinction.
+accent_primary   = "#00e5ff"
+accent_secondary = "#ffd400"
+
+error   = "#ff4d4f"
+warning = "#ffb020"
+success = "#2dd36f"
+info    = "#33b5ff"
+
+git_added        = "#2dd36f"
+git_modified     = "#ffb020"
+git_deleted      = "#ff4d4f"
+git_untracked    = "#ffffff"
+git_branch       = "#00e5ff"
+git_renamed      = "#5dd6ff"
+git_conflicted   = "#ff6b6b"
+git_type_changed = "#c084ff"
+
+pane_border  = "#666666"
+selection_fg = "#000000"
+overlay_bg   = "#000000cc"
+overlay_fg   = "#ffffff"
+hint_fg      = "#d9d9d9"

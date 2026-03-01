@@ -1,5 +1,5 @@
 use crate::panes;
-use crabontree_app::{load_config, reduce, themes_dir, AppState, JobExecutor};
+use crabontree_app::{load_config, reduce, save_config, themes_dir, AppState, JobExecutor};
 use crabontree_ui_core::Theme;
 use egui_dock::{DockState, NodeIndex};
 
@@ -11,6 +11,7 @@ pub(crate) struct CrabOnTreeApp {
     pub(crate) state: AppState,
     pub(crate) executor: JobExecutor,
     pub(crate) message_rx: tokio::sync::mpsc::Receiver<crabontree_app::AppMessage>,
+    pub(crate) pending_jobs: usize,
     pub(crate) theme: Theme,
     pub(crate) available_themes: Vec<(String, Theme)>,
     pub(crate) show_shortcuts_help: bool,
@@ -42,13 +43,32 @@ impl CrabOnTreeApp {
     }
 
     pub(crate) fn new(_cc: &eframe::CreationContext<'_>) -> Self {
-        let config = load_config();
+        let mut config = load_config();
         let available_themes = load_all_themes();
-        let theme = available_themes
+        let (resolved_theme_id, theme) = available_themes
             .iter()
             .find(|(id, _)| id == &config.theme)
-            .map(|(_, t)| t.clone())
-            .unwrap_or_else(Theme::fallback);
+            .map(|(id, t)| (id.clone(), t.clone()))
+            .unwrap_or_else(|| {
+                tracing::warn!(
+                    "Configured theme '{}' was not found. Falling back to 'dark'",
+                    config.theme
+                );
+                (
+                    "dark".to_string(),
+                    available_themes
+                        .iter()
+                        .find(|(id, _)| id == "dark")
+                        .map(|(_, t)| t.clone())
+                        .unwrap_or_else(Theme::fallback),
+                )
+            });
+        if config.theme != resolved_theme_id {
+            config.theme = resolved_theme_id;
+            if let Err(e) = save_config(&config) {
+                tracing::warn!("Failed to save normalized config theme: {}", e);
+            }
+        }
         let (executor, message_rx) = JobExecutor::new();
 
         let dock_state = if let Some(layout_json) = &config.dock_layout {
@@ -81,6 +101,7 @@ impl CrabOnTreeApp {
             },
             executor,
             message_rx,
+            pending_jobs: 0,
             theme,
             show_shortcuts_help: false,
             active_pane: 0,
@@ -91,13 +112,16 @@ impl CrabOnTreeApp {
 
     pub(crate) fn poll_messages(&mut self) {
         while let Ok(msg) = self.message_rx.try_recv() {
+            self.pending_jobs = self.pending_jobs.saturating_sub(1);
             self.handle_message(msg);
+            self.state.loading = self.pending_jobs > 0;
         }
     }
 
     pub(crate) fn handle_message(&mut self, message: crabontree_app::AppMessage) {
         let effect = reduce(&mut self.state, message);
         self.execute_effect(effect);
+        self.state.loading = self.pending_jobs > 0;
     }
 }
 
@@ -106,17 +130,8 @@ impl CrabOnTreeApp {
 ///
 /// Built-in ids are never overridden by user files with the same stem name.
 fn load_all_themes() -> Vec<(String, Theme)> {
-    let builtin_ids = [
-        "dark",
-        "light",
-        "jetbrains",
-        "visual_studio",
-        "crema",
-        "ide-like",
-    ];
-    let mut themes: Vec<(String, Theme)> = builtin_ids
-        .iter()
-        .filter_map(|&id| Theme::by_name(id).map(|t| (id.to_string(), t)))
+    let mut themes: Vec<(String, Theme)> = Theme::builtin_theme_ids()
+        .filter_map(|id| Theme::by_name(id).map(|t| (id.to_string(), t)))
         .collect();
 
     let Some(dir) = themes_dir() else {

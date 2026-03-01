@@ -31,94 +31,104 @@ pub fn render(
     let mut action = TopPanelAction::None;
 
     egui::TopBottomPanel::top("top_panel")
-        .frame(egui::Frame::side_top_panel(&ctx.style()).inner_margin(egui::Margin::symmetric(8.0, 5.0)))
+        .frame(
+            egui::Frame::side_top_panel(&ctx.style())
+                .inner_margin(egui::Margin::symmetric(8.0, 5.0)),
+        )
         .show(ctx, |ui| {
-        ui.horizontal(|ui| {
-            ui.heading("CrabOnTree");
+            ui.horizontal(|ui| {
+                ui.heading("CrabOnTree");
 
-            ui.add_space(20.0);
-
-            if ui.button("📂 Open Repository").clicked() {
-                if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                    action = TopPanelAction::OpenRepo(path);
-                }
-            }
-
-            if has_repo {
-                if ui.button("🔄 Refresh").clicked() {
-                    action = TopPanelAction::RefreshRepo;
-                }
-
-                if ui.button("✖ Close").clicked() {
-                    action = TopPanelAction::CloseRepo;
-                }
-
-                // Pane visibility toggles
                 ui.add_space(20.0);
-                ui.separator();
-                ui.add_space(10.0);
-                ui.label("Panes:");
 
-                // CommitHistory toggle
-                let commit_visible = visible_panes.contains(&crate::panes::Pane::CommitHistory);
-                let commit_text = if commit_visible {
-                    "★ History"
-                } else {
-                    "☆ History"
-                };
-                if ui.button(commit_text).clicked() {
-                    action = TopPanelAction::TogglePane(crate::panes::Pane::CommitHistory);
-                }
-
-                // Branches toggle
-                let branches_visible = visible_panes.contains(&crate::panes::Pane::Branches);
-                let branches_text = if branches_visible {
-                    "★ Branches"
-                } else {
-                    "☆ Branches"
-                };
-                if ui.button(branches_text).clicked() {
-                    action = TopPanelAction::TogglePane(crate::panes::Pane::Branches);
-                }
-
-                // ChangedFiles toggle
-                let files_visible = visible_panes.contains(&crate::panes::Pane::ChangedFiles);
-                let files_text = if files_visible {
-                    "★ Files"
-                } else {
-                    "☆ Files"
-                };
-                if ui.button(files_text).clicked() {
-                    action = TopPanelAction::TogglePane(crate::panes::Pane::ChangedFiles);
-                }
-
-                // DiffViewer toggle
-                let diff_visible = visible_panes.contains(&crate::panes::Pane::DiffViewer);
-                let diff_text = if diff_visible { "★ Diff" } else { "☆ Diff" };
-                if ui.button(diff_text).clicked() {
-                    action = TopPanelAction::TogglePane(crate::panes::Pane::DiffViewer);
-                }
-            }
-
-            // Theme selector
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if loading {
-                    ui.spinner();
-                    ui.add_space(10.0);
-                }
-
-                ui.menu_button("🎨 Theme", |ui| {
-                    for (id, theme) in available_themes {
-                        let label = if theme.name.is_empty() { id.as_str() } else { theme.name.as_str() };
-                        if ui.selectable_label(current_theme == id.as_str(), label).clicked() {
-                            action = TopPanelAction::SetTheme(id.clone());
-                            ui.close_menu();
-                        }
+                if ui.button("📂 Open Repository").clicked() {
+                    if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                        action = TopPanelAction::OpenRepo(path);
                     }
+                }
+
+                if has_repo {
+                    if ui.button("🔄 Refresh").clicked() {
+                        action = TopPanelAction::RefreshRepo;
+                    }
+
+                    if ui.button("✖ Close").clicked() {
+                        action = TopPanelAction::CloseRepo;
+                    }
+
+                    // Pane visibility toggles
+                    ui.add_space(20.0);
+                    ui.separator();
+                    ui.add_space(10.0);
+                    ui.label("Panes:");
+
+                    // CommitHistory toggle
+                    let commit_visible = visible_panes.contains(&crate::panes::Pane::CommitHistory);
+                    let commit_text = if commit_visible {
+                        "★ History"
+                    } else {
+                        "☆ History"
+                    };
+                    if ui.button(commit_text).clicked() {
+                        action = TopPanelAction::TogglePane(crate::panes::Pane::CommitHistory);
+                    }
+
+                    // Branches toggle
+                    let branches_visible = visible_panes.contains(&crate::panes::Pane::Branches);
+                    let branches_text = if branches_visible {
+                        "★ Branches"
+                    } else {
+                        "☆ Branches"
+                    };
+                    if ui.button(branches_text).clicked() {
+                        action = TopPanelAction::TogglePane(crate::panes::Pane::Branches);
+                    }
+
+                    // ChangedFiles toggle
+                    let files_visible = visible_panes.contains(&crate::panes::Pane::ChangedFiles);
+                    let files_text = if files_visible {
+                        "★ Files"
+                    } else {
+                        "☆ Files"
+                    };
+                    if ui.button(files_text).clicked() {
+                        action = TopPanelAction::TogglePane(crate::panes::Pane::ChangedFiles);
+                    }
+
+                    // DiffViewer toggle
+                    let diff_visible = visible_panes.contains(&crate::panes::Pane::DiffViewer);
+                    let diff_text = if diff_visible { "★ Diff" } else { "☆ Diff" };
+                    if ui.button(diff_text).clicked() {
+                        action = TopPanelAction::TogglePane(crate::panes::Pane::DiffViewer);
+                    }
+                }
+
+                // Theme selector
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if loading {
+                        ui.spinner();
+                        ui.add_space(10.0);
+                    }
+
+                    ui.menu_button("🎨 Theme", |ui| {
+                        for (id, theme) in available_themes {
+                            let label = if theme.name.is_empty() {
+                                id.as_str()
+                            } else {
+                                theme.name.as_str()
+                            };
+                            if ui
+                                .selectable_label(current_theme == id.as_str(), label)
+                                .clicked()
+                            {
+                                action = TopPanelAction::SetTheme(id.clone());
+                                ui.close_menu();
+                            }
+                        }
+                    });
                 });
             });
         });
-    });
 
     action
 }

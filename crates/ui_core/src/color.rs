@@ -28,8 +28,7 @@ impl Serialize for Color {
 impl<'de> Deserialize<'de> for Color {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let s = String::deserialize(d)?;
-        Color::from_hex(&s)
-            .ok_or_else(|| de::Error::custom(format!("invalid hex color: {}", s)))
+        Color::from_hex(&s).ok_or_else(|| de::Error::custom(format!("invalid hex color: {}", s)))
     }
 }
 

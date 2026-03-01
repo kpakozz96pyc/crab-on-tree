@@ -33,7 +33,6 @@ pub enum ChangedFilesAction {
     OpenFolder(PathBuf),
 }
 
-
 fn render_section(
     ui: &mut egui::Ui,
     id: &str,
