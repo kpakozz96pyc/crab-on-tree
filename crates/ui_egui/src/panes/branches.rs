@@ -14,6 +14,7 @@ fn render_local_section(
     current_branch: &str,
     selected_branch: Option<&String>,
     action: &mut BranchesAction,
+    is_focused: bool,
 ) {
     if branches.is_empty() {
         return;
@@ -27,30 +28,45 @@ fn render_local_section(
                 ui.push_id(format!("local_{}", idx), |ui| {
                     let is_current = branch.is_current || branch.name == current_branch;
                     let is_selected = selected_branch == Some(&branch.name);
+                    let is_row_focused = is_focused && is_selected;
+                    let tc = ThemeColors::get(ui.ctx());
+                    let row_bg = if is_row_focused {
+                        tc.focused_row_bg
+                    } else if is_selected {
+                        tc.selected_row_bg
+                    } else {
+                        egui::Color32::TRANSPARENT
+                    };
 
-                    let response = ui.horizontal(|ui| {
-                        // Indicator for current branch
-                        if is_current {
-                            ui.label("*");
-                        } else {
-                            ui.label(" ");
-                        }
+                    let response = egui::Frame::none()
+                        .fill(row_bg)
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                // Indicator for current branch
+                                if is_current {
+                                    ui.label("*");
+                                } else {
+                                    ui.label(" ");
+                                }
 
-                        // Branch icon
-                        ui.label(">");
+                                // Branch icon
+                                ui.label(">");
 
-                        // Branch name
-                        let text = if is_current {
-                            egui::RichText::new(&branch.name).strong()
-                        } else {
-                            egui::RichText::new(&branch.name)
-                        };
+                                // Branch name
+                                let text = if is_current {
+                                    egui::RichText::new(&branch.name).strong()
+                                } else {
+                                    egui::RichText::new(&branch.name)
+                                };
 
-                        ui.selectable_label(is_selected, text)
-                    });
+                                ui.label(text)
+                            })
+                            .inner
+                        })
+                        .inner;
 
                     // Single-click: select branch
-                    if response.inner.clicked() {
+                    if response.clicked() {
                         *action = BranchesAction::SelectBranch {
                             name: branch.name.clone(),
                             is_remote: false,
@@ -58,7 +74,7 @@ fn render_local_section(
                     }
 
                     // Double-click: checkout branch
-                    if response.inner.double_clicked() && !is_current {
+                    if response.double_clicked() && !is_current {
                         *action = BranchesAction::CheckoutBranch {
                             name: branch.name.clone(),
                             is_remote: false,
@@ -74,6 +90,7 @@ fn render_remote_section(
     remotes: &std::collections::HashMap<String, Vec<crabontree_app::BranchInfo>>,
     selected_branch: Option<&String>,
     action: &mut BranchesAction,
+    is_focused: bool,
 ) {
     if remotes.is_empty() {
         return;
@@ -98,15 +115,30 @@ fn render_remote_section(
                                 let full_name = format!("{}/{}", remote_name, branch.name);
                                 let is_selected = selected_branch.as_ref().map(|s| s.as_str())
                                     == Some(&full_name);
+                                let is_row_focused = is_focused && is_selected;
+                                let tc = ThemeColors::get(ui.ctx());
+                                let row_bg = if is_row_focused {
+                                    tc.focused_row_bg
+                                } else if is_selected {
+                                    tc.selected_row_bg
+                                } else {
+                                    egui::Color32::TRANSPARENT
+                                };
 
-                                let response = ui.horizontal(|ui| {
-                                    ui.label(" "); // Space for alignment with local branches
-                                    ui.label("🌿");
-                                    ui.selectable_label(is_selected, &branch.name)
-                                });
+                                let response = egui::Frame::none()
+                                    .fill(row_bg)
+                                    .show(ui, |ui| {
+                                        ui.horizontal(|ui| {
+                                            ui.label(" "); // Space for alignment with local branches
+                                            ui.label("🌿");
+                                            ui.label(&branch.name)
+                                        })
+                                        .inner
+                                    })
+                                    .inner;
 
                                 // Single-click: select branch
-                                if response.inner.clicked() {
+                                if response.clicked() {
                                     *action = BranchesAction::SelectBranch {
                                         name: full_name.clone(),
                                         is_remote: true,
@@ -114,7 +146,7 @@ fn render_remote_section(
                                 }
 
                                 // Double-click: checkout remote branch
-                                if response.inner.double_clicked() {
+                                if response.double_clicked() {
                                     *action = BranchesAction::CheckoutBranch {
                                         name: full_name,
                                         is_remote: true,
@@ -127,7 +159,12 @@ fn render_remote_section(
         });
 }
 
-pub fn render(ui: &mut egui::Ui, branch_tree: &BranchTreeState, loading: bool) -> BranchesAction {
+pub fn render(
+    ui: &mut egui::Ui,
+    branch_tree: &BranchTreeState,
+    loading: bool,
+    is_focused: bool,
+) -> BranchesAction {
     let mut action = BranchesAction::None;
 
     // Store pane rect for overlay
@@ -174,6 +211,7 @@ pub fn render(ui: &mut egui::Ui, branch_tree: &BranchTreeState, loading: bool) -
             &branch_tree.current_branch,
             branch_tree.selected_branch.as_ref(),
             &mut action,
+            is_focused,
         );
         ui.add_space(5.0);
     }
@@ -185,6 +223,7 @@ pub fn render(ui: &mut egui::Ui, branch_tree: &BranchTreeState, loading: bool) -
             &branch_tree.remote_branches,
             branch_tree.selected_branch.as_ref(),
             &mut action,
+            is_focused,
         );
     }
 

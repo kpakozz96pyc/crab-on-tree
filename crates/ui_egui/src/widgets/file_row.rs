@@ -25,15 +25,23 @@ pub struct FileRow<'a> {
     pub status: &'a WorkingDirStatus,
     /// Whether this file is currently selected
     pub is_selected: bool,
+    /// Whether this row currently has keyboard/mouse focus within the active pane
+    pub is_focused: bool,
 }
 
 impl<'a> FileRow<'a> {
     /// Creates a new file row widget.
-    pub fn new(path: &'a Path, status: &'a WorkingDirStatus, is_selected: bool) -> Self {
+    pub fn new(
+        path: &'a Path,
+        status: &'a WorkingDirStatus,
+        is_selected: bool,
+        is_focused: bool,
+    ) -> Self {
         Self {
             path,
             status,
             is_selected,
+            is_focused,
         }
     }
 
@@ -41,15 +49,21 @@ impl<'a> FileRow<'a> {
     pub fn render(self, ui: &mut egui::Ui) -> (FileRowInteraction, egui::Response) {
         let (status_icon, status_color) = self.get_status_info(ui);
 
-        let row = ui.horizontal(|ui| {
-            ui.set_min_width(ui.available_width());
-            ui.colored_label(status_color, egui::RichText::new(status_icon).strong());
-            ui.selectable_label(self.is_selected, self.path.display().to_string())
-        });
+        let row = egui::Frame::none()
+            .fill(self.row_bg_color(ui))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.set_min_width(ui.available_width());
+                    ui.colored_label(status_color, egui::RichText::new(status_icon).strong());
+                    ui.selectable_label(false, self.path.display().to_string())
+                })
+                .inner
+            })
+            .inner;
 
-        let interaction = if row.inner.double_clicked() {
+        let interaction = if row.double_clicked() {
             FileRowInteraction::DoubleClick
-        } else if row.inner.clicked() {
+        } else if row.clicked() {
             let ctrl = ui.input(|i| i.modifiers.ctrl || i.modifiers.command);
             let shift = ui.input(|i| i.modifiers.shift);
             FileRowInteraction::SingleClick { ctrl, shift }
@@ -57,7 +71,7 @@ impl<'a> FileRow<'a> {
             FileRowInteraction::None
         };
 
-        (interaction, row.inner)
+        (interaction, row)
     }
 
     /// Gets the status icon and color for the current file status.
@@ -70,6 +84,17 @@ impl<'a> FileRow<'a> {
             WorkingDirStatus::Renamed => ("R", tc.git_renamed),
             WorkingDirStatus::Conflicted => ("!", tc.git_conflicted),
             WorkingDirStatus::TypeChanged => ("T", tc.git_type_changed),
+        }
+    }
+
+    fn row_bg_color(&self, ui: &egui::Ui) -> egui::Color32 {
+        let tc = ThemeColors::get(ui.ctx());
+        if self.is_focused {
+            tc.focused_row_bg
+        } else if self.is_selected {
+            tc.selected_row_bg
+        } else {
+            egui::Color32::TRANSPARENT
         }
     }
 }

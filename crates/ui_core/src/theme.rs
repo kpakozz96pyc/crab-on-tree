@@ -62,6 +62,14 @@ pub struct Theme {
 
     // UI structural colors
     pub pane_border: Color,
+    #[serde(default = "default_focused_pane_border_color")]
+    pub focused_pane_border_color: Color,
+    #[serde(default = "default_focused_pane_border_width")]
+    pub focused_pane_border_width: f32,
+    #[serde(default = "default_selected_row_bg")]
+    pub selected_row_bg: Color,
+    #[serde(default = "default_focused_row_bg")]
+    pub focused_row_bg: Color,
     pub selection_fg: Color,
     pub overlay_bg: Color,
     pub overlay_fg: Color,
@@ -100,6 +108,23 @@ impl Theme {
     pub fn fallback() -> Self {
         Self::by_name("dark").expect("built-in dark theme must always parse")
     }
+}
+
+fn default_focused_pane_border_color() -> Color {
+    // Similar to dark theme accent as a safe fallback.
+    Color::new(0.345, 0.651, 1.0, 1.0)
+}
+
+fn default_focused_pane_border_width() -> f32 {
+    2.0
+}
+
+fn default_selected_row_bg() -> Color {
+    Color::new(0.122, 0.435, 0.922, 1.0)
+}
+
+fn default_focused_row_bg() -> Color {
+    Color::new(0.129, 0.149, 0.176, 1.0)
 }
 
 #[cfg(test)]

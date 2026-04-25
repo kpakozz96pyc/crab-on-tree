@@ -37,6 +37,10 @@ git_type_changed = "#7c3aed"
 
 # ── UI structure ──────────────────────────────────────────────────────────────
 pane_border = "#d6d0c2"
+focused_pane_border_color = "#1f6feb"
+focused_pane_border_width = 2.0
+selected_row_bg = "#e4dfd1"
+focused_row_bg = "#1a56c2"
 
 selection_fg = "#ffffff"
 

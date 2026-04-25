@@ -39,9 +39,11 @@ fn render_section(
     title: &str,
     files: &[crabontree_app::WorkingDirFile],
     selected_files: &std::collections::HashSet<PathBuf>,
+    selected_file: Option<&PathBuf>,
     is_commit_view: bool,
     show_context_menu: bool,
     action: &mut ChangedFilesAction,
+    is_focused: bool,
 ) {
     egui::CollapsingHeader::new(format!("{} ({})", title, files.len()))
         .id_source(id)
@@ -56,7 +58,10 @@ fn render_section(
                 let (interaction, row_response) = ui
                     .push_id(format!("{}_{}", id, idx), |ui| {
                         let is_selected = selected_files.contains(&file.path);
-                        FileRow::new(&file.path, &file.status, is_selected).render(ui)
+                        let is_row_focused =
+                            is_focused && selected_file.is_some_and(|p| p == &file.path);
+                        FileRow::new(&file.path, &file.status, is_selected, is_row_focused)
+                            .render(ui)
                     })
                     .inner;
 
@@ -112,7 +117,12 @@ fn render_section(
         });
 }
 
-pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> ChangedFilesAction {
+pub fn render(
+    ui: &mut egui::Ui,
+    files: &ChangedFilesState,
+    loading: bool,
+    is_focused: bool,
+) -> ChangedFilesAction {
     let is_commit_view = files.is_commit_view;
     let panel_height = if is_commit_view { 230.0 } else { 220.0 };
 
@@ -152,9 +162,11 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                         "Staged",
                         &files.staged,
                         &files.selected_files,
+                        files.selected_file.as_ref(),
                         is_commit_view,
                         false,
                         &mut list_action,
+                        is_focused,
                     );
                     if !is_commit_view {
                         ui.add_space(5.0);
@@ -165,9 +177,11 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                         "Unstaged",
                         &files.unstaged,
                         &files.selected_files,
+                        files.selected_file.as_ref(),
                         is_commit_view,
                         !is_commit_view, // context menu only in working dir view
                         &mut list_action,
+                        is_focused,
                     );
                     if !is_commit_view {
                         ui.add_space(5.0);
@@ -178,9 +192,11 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                         "Untracked",
                         &files.untracked,
                         &files.selected_files,
+                        files.selected_file.as_ref(),
                         is_commit_view,
                         false,
                         &mut list_action,
+                        is_focused,
                     );
                     if !is_commit_view {
                         ui.add_space(5.0);
@@ -191,9 +207,11 @@ pub fn render(ui: &mut egui::Ui, files: &ChangedFilesState, loading: bool) -> Ch
                         "Conflicted",
                         &files.conflicted,
                         &files.selected_files,
+                        files.selected_file.as_ref(),
                         is_commit_view,
                         false,
                         &mut list_action,
+                        is_focused,
                     );
                 });
         },

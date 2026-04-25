@@ -1,10 +1,13 @@
+use crate::utils::theme::ThemeColors;
+
 /// Renders a selectable row with hover and click functionality that spans 100% width
-/// Returns true if the row was clicked
+/// Returns the row response.
 pub fn selectable_row(
     ui: &mut egui::Ui,
     text: impl Into<egui::WidgetText>,
     is_selected: bool,
-) -> bool {
+    is_focused: bool,
+) -> egui::Response {
     let text = text.into();
     let available_width = ui.available_width();
 
@@ -21,8 +24,11 @@ pub fn selectable_row(
         let visuals = ui.style().interact(&response);
 
         // Determine background color based on state
-        let bg_color = if is_selected {
-            ui.visuals().selection.bg_fill
+        let tc = ThemeColors::get(ui.ctx());
+        let bg_color = if is_focused {
+            tc.focused_row_bg
+        } else if is_selected {
+            tc.selected_row_bg
         } else if response.hovered() {
             ui.visuals().widgets.hovered.bg_fill
         } else {
@@ -46,5 +52,5 @@ pub fn selectable_row(
         ui.painter().galley(text_pos, galley, text_color);
     }
 
-    response.clicked()
+    response
 }

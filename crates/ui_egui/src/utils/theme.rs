@@ -18,6 +18,10 @@ pub struct ThemeColors {
     pub overlay_bg: egui::Color32,
     pub overlay_fg: egui::Color32,
     pub hint_fg: egui::Color32,
+    pub focused_pane_border_color: egui::Color32,
+    pub focused_pane_border_width: f32,
+    pub selected_row_bg: egui::Color32,
+    pub focused_row_bg: egui::Color32,
 }
 
 impl Default for ThemeColors {
@@ -31,6 +35,10 @@ impl Default for ThemeColors {
             overlay_bg: egui::Color32::from_black_alpha(128),
             overlay_fg: egui::Color32::WHITE,
             hint_fg: egui::Color32::from_gray(80),
+            focused_pane_border_color: egui::Color32::from_rgb(88, 166, 255),
+            focused_pane_border_width: 2.0,
+            selected_row_bg: egui::Color32::from_rgb(31, 111, 235),
+            focused_row_bg: egui::Color32::from_rgb(33, 38, 45),
         }
     }
 }
@@ -128,7 +136,7 @@ pub fn apply_theme(ctx: &egui::Context, theme: &Theme) {
     visuals.widgets.open.fg_stroke = egui::Stroke::new(1.5, fg_primary);
 
     // ── Selection ────────────────────────────────────────────────────────────
-    visuals.selection.bg_fill = accent2;
+    visuals.selection.bg_fill = color_to_egui(theme.selected_row_bg);
     visuals.selection.stroke = egui::Stroke::new(1.0, color_to_egui(theme.selection_fg));
 
     // ── Window chrome ────────────────────────────────────────────────────────
@@ -154,6 +162,10 @@ pub fn apply_theme(ctx: &egui::Context, theme: &Theme) {
         overlay_bg: color_to_egui(theme.overlay_bg),
         overlay_fg: color_to_egui(theme.overlay_fg),
         hint_fg: color_to_egui(theme.hint_fg),
+        focused_pane_border_color: color_to_egui(theme.focused_pane_border_color),
+        focused_pane_border_width: theme.focused_pane_border_width.max(0.5),
+        selected_row_bg: color_to_egui(theme.selected_row_bg),
+        focused_row_bg: color_to_egui(theme.focused_row_bg),
     }
     .store(ctx);
 }

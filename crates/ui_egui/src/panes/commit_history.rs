@@ -14,6 +14,7 @@ pub fn render(
     commits: &[Commit],
     selected_commit: Option<&String>,
     has_working_dir_changes: bool,
+    is_focused: bool,
 ) -> CommitHistoryAction {
     if commits.is_empty() {
         ui.vertical_centered(|ui| {
@@ -29,10 +30,12 @@ pub fn render(
 
         ui.push_id("working_directory", |ui| {
             let is_selected = selected_commit.map(String::as_str) == Some(WORKING_DIR_HASH);
+            let is_row_focused = is_focused && is_selected;
             let status_indicator = if has_working_dir_changes { " *" } else { "" };
             let text = format!("0000000 - Working Directory{}", status_indicator);
 
-            if widgets::selectable_row(ui, text, is_selected) {
+            let response = widgets::selectable_row(ui, text, is_selected, is_row_focused);
+            if response.clicked() {
                 action = if is_selected {
                     CommitHistoryAction::DeselectCommit
                 } else {
@@ -44,9 +47,11 @@ pub fn render(
         for (idx, commit) in commits.iter().enumerate() {
             ui.push_id(format!("commit_{}", idx), |ui| {
                 let is_selected = selected_commit == Some(&commit.hash);
+                let is_row_focused = is_focused && is_selected;
                 let text = format!("{} - {}", &commit.hash[..7], commit.message_summary);
 
-                if widgets::selectable_row(ui, text, is_selected) {
+                let response = widgets::selectable_row(ui, text, is_selected, is_row_focused);
+                if response.clicked() {
                     action = if is_selected {
                         CommitHistoryAction::DeselectCommit
                     } else {

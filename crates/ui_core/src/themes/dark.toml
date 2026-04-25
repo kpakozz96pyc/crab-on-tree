@@ -75,6 +75,10 @@ git_type_changed = "#d2a8ff"
 
 # Pane/window border lines (noninteractive bg_stroke, window_stroke)
 pane_border = "#30363d"
+focused_pane_border_color = "#58a6ff"
+focused_pane_border_width = 2.0
+selected_row_bg = "#2d333b"
+focused_row_bg = "#1f6feb"
 
 # Text colour drawn on top of the selection highlight (accent_secondary background)
 selection_fg = "#ffffff"

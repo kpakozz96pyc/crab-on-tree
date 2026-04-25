@@ -30,6 +30,10 @@ git_conflicted   = "#ff6b6b"
 git_type_changed = "#c084ff"
 
 pane_border  = "#666666"
+focused_pane_border_color = "#00e5ff"
+focused_pane_border_width = 2.5
+selected_row_bg = "#1f1f1f"
+focused_row_bg = "#ffd400"
 selection_fg = "#000000"
 overlay_bg   = "#000000cc"
 overlay_fg   = "#ffffff"

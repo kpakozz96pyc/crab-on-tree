@@ -39,7 +39,8 @@ impl CrabOnTreeApp {
     }
 
     fn render_dock_layout(&mut self, ui: &mut egui::Ui) {
-        let (action, new_pane) = keyboard::handle_shortcuts(ui, self.active_pane);
+        let (action, new_pane) =
+            keyboard::handle_shortcuts(ui, self.active_pane, self.state.current_repo.as_ref());
         self.active_pane = new_pane;
 
         match action {
@@ -80,6 +81,7 @@ impl CrabOnTreeApp {
             messages: &mut messages,
             loading: self.state.loading,
             committing: self.state.committing,
+            active_pane: self.active_pane,
         };
 
         DockArea::new(&mut self.dock_state).show_inside(ui, &mut viewer);
@@ -96,6 +98,7 @@ struct PaneViewer<'a> {
     messages: &'a mut Vec<crabontree_app::AppMessage>,
     loading: bool,
     committing: bool,
+    active_pane: usize,
 }
 
 impl<'a> egui_dock::TabViewer for PaneViewer<'a> {
@@ -108,6 +111,12 @@ impl<'a> egui_dock::TabViewer for PaneViewer<'a> {
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
         let repo = self.repo_data;
         let scroll_id = format!("{:?}_dock_scroll", tab);
+        let is_active = pane_to_index(*tab) == self.active_pane;
+        let stroke = if is_active {
+            egui::Stroke::new(2.0, ui.visuals().selection.stroke.color)
+        } else {
+            egui::Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color)
+        };
 
         let scroll_config = match tab {
             panes::Pane::DiffViewer => {
@@ -116,45 +125,59 @@ impl<'a> egui_dock::TabViewer for PaneViewer<'a> {
             _ => panes::scrollable_pane::ScrollablePaneConfig::new(&scroll_id),
         };
 
-        panes::scrollable_pane::render(ui, &scroll_config, |ui| match tab {
-            panes::Pane::CommitHistory => {
-                let action = panes::commit_history::render(
-                    ui,
-                    &repo.commits,
-                    repo.selected_commit.as_ref(),
-                    !repo.working_dir_files.is_empty(),
-                );
-                if let Some(msg) = panes::commit_history::action_to_message(action) {
-                    self.messages.push(msg);
-                }
-            }
-            panes::Pane::ChangedFiles => {
-                if let Some(files) = &repo.changed_files {
-                    let action = panes::changed_files::render(ui, files, self.committing);
-                    if let Some(msg) = panes::changed_files::action_to_message(action) {
-                        self.messages.push(msg);
+        egui::Frame::none()
+            .stroke(stroke)
+            .inner_margin(egui::Margin::same(2.0))
+            .show(ui, |ui| {
+                panes::scrollable_pane::render(ui, &scroll_config, |ui| match tab {
+                    panes::Pane::CommitHistory => {
+                        let action = panes::commit_history::render(
+                            ui,
+                            &repo.commits,
+                            repo.selected_commit.as_ref(),
+                            !repo.working_dir_files.is_empty(),
+                        );
+                        if let Some(msg) = panes::commit_history::action_to_message(action) {
+                            self.messages.push(msg);
+                        }
                     }
-                } else {
-                    ui.label("Loading changed files...");
-                }
-            }
-            panes::Pane::DiffViewer => {
-                panes::diff_viewer::render(ui, &repo.file_view);
-            }
-            panes::Pane::Branches => {
-                if let Some(branch_tree) = &repo.branch_tree {
-                    let action = panes::branches::render(ui, branch_tree, self.loading);
-                    if let Some(msg) = panes::branches::action_to_message(action) {
-                        self.messages.push(msg);
+                    panes::Pane::ChangedFiles => {
+                        if let Some(files) = &repo.changed_files {
+                            let action = panes::changed_files::render(ui, files, self.committing);
+                            if let Some(msg) = panes::changed_files::action_to_message(action) {
+                                self.messages.push(msg);
+                            }
+                        } else {
+                            ui.label("Loading changed files...");
+                        }
                     }
-                } else {
-                    ui.label("Loading branches...");
-                }
-            }
-        });
+                    panes::Pane::DiffViewer => {
+                        panes::diff_viewer::render(ui, &repo.file_view);
+                    }
+                    panes::Pane::Branches => {
+                        if let Some(branch_tree) = &repo.branch_tree {
+                            let action = panes::branches::render(ui, branch_tree, self.loading);
+                            if let Some(msg) = panes::branches::action_to_message(action) {
+                                self.messages.push(msg);
+                            }
+                        } else {
+                            ui.label("Loading branches...");
+                        }
+                    }
+                });
+            });
     }
 
     fn closeable(&mut self, _tab: &mut Self::Tab) -> bool {
         false
+    }
+}
+
+fn pane_to_index(pane: panes::Pane) -> usize {
+    match pane {
+        panes::Pane::CommitHistory => 0,
+        panes::Pane::Branches => 1,
+        panes::Pane::ChangedFiles => 2,
+        panes::Pane::DiffViewer => 3,
     }
 }
