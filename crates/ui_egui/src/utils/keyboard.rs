@@ -19,6 +19,15 @@ pub enum KeyboardAction {
     ToggleHelp,
     SelectCommit(String),
     SelectFile(PathBuf),
+    ScrollDiff(DiffScrollAction),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum DiffScrollAction {
+    Line(i32),
+    Page(i32),
+    Home,
+    End,
 }
 
 /// Handles keyboard shortcuts and returns an action.
@@ -28,6 +37,7 @@ pub fn handle_shortcuts(
     ui: &egui::Ui,
     current_pane: usize,
     repo: Option<&RepoState>,
+    visible_panes: &[usize],
 ) -> (KeyboardAction, usize) {
     let any_text_focused = ui.memory(|mem| mem.focused().is_some());
 
@@ -35,52 +45,84 @@ pub fn handle_shortcuts(
         return (KeyboardAction::None, current_pane);
     }
 
-    // Pane selection: 1, 2, 3, 4
-    if ui.input(|i| i.key_pressed(egui::Key::Num1)) {
+    // Pane selection: 1, 2, 3, 4 (only visible panes).
+    if ui.input(|i| i.key_pressed(egui::Key::Num1)) && visible_panes.contains(&0) {
         return (KeyboardAction::SetActivePane, 0);
     }
-    if ui.input(|i| i.key_pressed(egui::Key::Num2)) {
+    if ui.input(|i| i.key_pressed(egui::Key::Num2)) && visible_panes.contains(&1) {
         return (KeyboardAction::SetActivePane, 1);
     }
-    if ui.input(|i| i.key_pressed(egui::Key::Num3)) {
+    if ui.input(|i| i.key_pressed(egui::Key::Num3)) && visible_panes.contains(&2) {
         return (KeyboardAction::SetActivePane, 2);
     }
-    if ui.input(|i| i.key_pressed(egui::Key::Num4)) {
+    if ui.input(|i| i.key_pressed(egui::Key::Num4)) && visible_panes.contains(&3) {
         return (KeyboardAction::SetActivePane, 3);
     }
 
     // Tab to cycle through panes
     if ui.input(|i| i.key_pressed(egui::Key::Tab) && !i.modifiers.shift) {
-        let new_pane = (current_pane + 1) % PANE_COUNT;
+        let new_pane = next_visible_pane(current_pane, visible_panes, true);
         return (KeyboardAction::SetActivePane, new_pane);
     }
 
     // Shift+Tab to cycle backward
     if ui.input(|i| i.key_pressed(egui::Key::Tab) && i.modifiers.shift) {
-        let new_pane = if current_pane == 0 {
-            PANE_COUNT - 1
-        } else {
-            current_pane - 1
-        };
+        let new_pane = next_visible_pane(current_pane, visible_panes, false);
         return (KeyboardAction::SetActivePane, new_pane);
     }
 
     // Left/Right to switch active pane.
     if ui.input(|i| i.key_pressed(egui::Key::ArrowRight)) {
-        let new_pane = (current_pane + 1) % PANE_COUNT;
+        let new_pane = next_visible_pane(current_pane, visible_panes, true);
         return (KeyboardAction::SetActivePane, new_pane);
     }
     if ui.input(|i| i.key_pressed(egui::Key::ArrowLeft)) {
-        let new_pane = if current_pane == 0 {
-            PANE_COUNT - 1
-        } else {
-            current_pane - 1
-        };
+        let new_pane = next_visible_pane(current_pane, visible_panes, false);
         return (KeyboardAction::SetActivePane, new_pane);
     }
 
-    // Up/Down to navigate selected item in active pane.
+    // Diff pane keyboard scrolling.
     if let Some(repo) = repo {
+        if current_pane == 3 {
+            if ui.input(|i| i.key_pressed(egui::Key::ArrowDown)) {
+                return (
+                    KeyboardAction::ScrollDiff(DiffScrollAction::Line(-1)),
+                    current_pane,
+                );
+            }
+            if ui.input(|i| i.key_pressed(egui::Key::ArrowUp)) {
+                return (
+                    KeyboardAction::ScrollDiff(DiffScrollAction::Line(1)),
+                    current_pane,
+                );
+            }
+            if ui.input(|i| i.key_pressed(egui::Key::PageDown)) {
+                return (
+                    KeyboardAction::ScrollDiff(DiffScrollAction::Page(-1)),
+                    current_pane,
+                );
+            }
+            if ui.input(|i| i.key_pressed(egui::Key::PageUp)) {
+                return (
+                    KeyboardAction::ScrollDiff(DiffScrollAction::Page(1)),
+                    current_pane,
+                );
+            }
+            if ui.input(|i| i.key_pressed(egui::Key::Home)) {
+                return (
+                    KeyboardAction::ScrollDiff(DiffScrollAction::Home),
+                    current_pane,
+                );
+            }
+            if ui.input(|i| i.key_pressed(egui::Key::End)) {
+                return (
+                    KeyboardAction::ScrollDiff(DiffScrollAction::End),
+                    current_pane,
+                );
+            }
+        }
+
+        // Up/Down to navigate selected item in active pane.
         if ui.input(|i| i.key_pressed(egui::Key::ArrowDown)) {
             return navigate_down(current_pane, repo)
                 .map_or((KeyboardAction::None, current_pane), |action| {
@@ -111,6 +153,24 @@ pub fn handle_shortcuts(
     (KeyboardAction::None, current_pane)
 }
 
+fn next_visible_pane(current: usize, visible: &[usize], forward: bool) -> usize {
+    if visible.is_empty() {
+        return current.min(PANE_COUNT - 1);
+    }
+
+    if let Some(pos) = visible.iter().position(|p| *p == current) {
+        if forward {
+            visible[(pos + 1) % visible.len()]
+        } else if pos == 0 {
+            visible[visible.len() - 1]
+        } else {
+            visible[pos - 1]
+        }
+    } else {
+        visible[0]
+    }
+}
+
 /// Converts a KeyboardAction to an AppMessage.
 pub fn action_to_message(action: KeyboardAction) -> Option<AppMessage> {
     match action {
@@ -119,6 +179,7 @@ pub fn action_to_message(action: KeyboardAction) -> Option<AppMessage> {
         KeyboardAction::ToggleHelp => None, // Handled in main app state
         KeyboardAction::SelectCommit(hash) => Some(AppMessage::CommitSelected(hash)),
         KeyboardAction::SelectFile(path) => Some(AppMessage::ChangedFileSelected(path)),
+        KeyboardAction::ScrollDiff(_) => None,
     }
 }
 
@@ -166,7 +227,8 @@ fn step_selection<T: Clone + PartialEq>(
         return None;
     }
 
-    let next_idx = match current.and_then(|c| items.iter().position(|i| i == c)) {
+    let current_idx = current.and_then(|c| items.iter().position(|i| i == c));
+    let next_idx = match current_idx {
         Some(idx) => {
             if forward {
                 (idx + 1).min(items.len() - 1)
@@ -182,6 +244,12 @@ fn step_selection<T: Clone + PartialEq>(
             }
         }
     };
+
+    if let Some(idx) = current_idx {
+        if idx == next_idx {
+            return None;
+        }
+    }
 
     Some(items[next_idx].clone())
 }
