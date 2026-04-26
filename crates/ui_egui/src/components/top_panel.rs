@@ -14,6 +14,7 @@ pub enum TopPanelAction {
     RefreshRepo,
     CloseRepo,
     TogglePane(crate::panes::Pane),
+    ResetLayout,
     SetTheme(String),
 }
 
@@ -56,50 +57,59 @@ pub fn render(
                         action = TopPanelAction::CloseRepo;
                     }
 
-                    // Pane visibility toggles
+                    // Pane visibility toggles (dropdown)
                     ui.add_space(20.0);
                     ui.separator();
                     ui.add_space(10.0);
-                    ui.label("Panes:");
 
-                    // CommitHistory toggle
-                    let commit_visible = visible_panes.contains(&crate::panes::Pane::CommitHistory);
-                    let commit_text = if commit_visible {
-                        "★ History"
-                    } else {
-                        "☆ History"
-                    };
-                    if ui.button(commit_text).clicked() {
-                        action = TopPanelAction::TogglePane(crate::panes::Pane::CommitHistory);
-                    }
+                    ui.menu_button("Panels", |ui| {
+                        let commit_visible =
+                            visible_panes.contains(&crate::panes::Pane::CommitHistory);
+                        let commit_text = if commit_visible {
+                            "★ History"
+                        } else {
+                            "☆ History"
+                        };
+                        if ui.button(commit_text).clicked() {
+                            action = TopPanelAction::TogglePane(crate::panes::Pane::CommitHistory);
+                            ui.close_menu();
+                        }
 
-                    // Branches toggle
-                    let branches_visible = visible_panes.contains(&crate::panes::Pane::Branches);
-                    let branches_text = if branches_visible {
-                        "★ Branches"
-                    } else {
-                        "☆ Branches"
-                    };
-                    if ui.button(branches_text).clicked() {
-                        action = TopPanelAction::TogglePane(crate::panes::Pane::Branches);
-                    }
+                        let branches_visible =
+                            visible_panes.contains(&crate::panes::Pane::Branches);
+                        let branches_text = if branches_visible {
+                            "★ Branches"
+                        } else {
+                            "☆ Branches"
+                        };
+                        if ui.button(branches_text).clicked() {
+                            action = TopPanelAction::TogglePane(crate::panes::Pane::Branches);
+                            ui.close_menu();
+                        }
 
-                    // ChangedFiles toggle
-                    let files_visible = visible_panes.contains(&crate::panes::Pane::ChangedFiles);
-                    let files_text = if files_visible {
-                        "★ Files"
-                    } else {
-                        "☆ Files"
-                    };
-                    if ui.button(files_text).clicked() {
-                        action = TopPanelAction::TogglePane(crate::panes::Pane::ChangedFiles);
-                    }
+                        let files_visible =
+                            visible_panes.contains(&crate::panes::Pane::ChangedFiles);
+                        let files_text = if files_visible {
+                            "★ Files"
+                        } else {
+                            "☆ Files"
+                        };
+                        if ui.button(files_text).clicked() {
+                            action = TopPanelAction::TogglePane(crate::panes::Pane::ChangedFiles);
+                            ui.close_menu();
+                        }
 
-                    // DiffViewer toggle
-                    let diff_visible = visible_panes.contains(&crate::panes::Pane::DiffViewer);
-                    let diff_text = if diff_visible { "★ Diff" } else { "☆ Diff" };
-                    if ui.button(diff_text).clicked() {
-                        action = TopPanelAction::TogglePane(crate::panes::Pane::DiffViewer);
+                        let diff_visible =
+                            visible_panes.contains(&crate::panes::Pane::DiffViewer);
+                        let diff_text = if diff_visible { "★ Diff" } else { "☆ Diff" };
+                        if ui.button(diff_text).clicked() {
+                            action = TopPanelAction::TogglePane(crate::panes::Pane::DiffViewer);
+                            ui.close_menu();
+                        }
+                    });
+
+                    if ui.button("Reset Layout").clicked() {
+                        action = TopPanelAction::ResetLayout;
                     }
                 }
 
@@ -140,7 +150,8 @@ pub fn action_to_message(action: &TopPanelAction) -> Option<AppMessage> {
         TopPanelAction::OpenRepo(path) => Some(AppMessage::OpenRepoRequested(path.clone())),
         TopPanelAction::RefreshRepo => Some(AppMessage::RefreshRepo),
         TopPanelAction::CloseRepo => Some(AppMessage::CloseRepo),
-        TopPanelAction::TogglePane(_) => None, // Handled separately in lifecycle.rs
+        TopPanelAction::TogglePane(_) => None,  // Handled separately in lifecycle.rs
+        TopPanelAction::ResetLayout => None,   // Handled separately in lifecycle.rs
         TopPanelAction::SetTheme(_) => None,   // Handled separately in lifecycle.rs
     }
 }

@@ -1,4 +1,4 @@
-use crate::runtime::CrabOnTreeApp;
+use crate::runtime::{CrabOnTreeApp};
 use crate::{components, utils::theme};
 use crabontree_app::save_config;
 use eframe::egui;
@@ -23,6 +23,15 @@ impl eframe::App for CrabOnTreeApp {
 
         if let components::top_panel::TopPanelAction::TogglePane(pane) = &top_action {
             self.toggle_pane(*pane);
+        }
+
+        if matches!(
+            top_action,
+            components::top_panel::TopPanelAction::ResetLayout
+        ) {
+            self.dock_state = CrabOnTreeApp::create_default_dock_layout();
+            self.saved_dock_states.clear();
+            self.active_pane = 0;
         }
 
         if let components::top_panel::TopPanelAction::SetTheme(name) = &top_action {
