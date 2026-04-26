@@ -1,5 +1,6 @@
 use crate::ChangedFilesState;
 use std::collections::HashSet;
+
 use std::path::{Path, PathBuf};
 
 pub(in crate::reducer) fn collect_files_to_stage(files: &ChangedFilesState) -> Vec<PathBuf> {

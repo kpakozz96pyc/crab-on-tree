@@ -18,7 +18,8 @@ pub enum KeyboardAction {
     RefreshRepo,
     ToggleHelp,
     SelectCommit(String),
-    SelectFile(PathBuf),
+    NavigateFile(PathBuf),
+    SelectFileWithModifiers { path: PathBuf, ctrl: bool, shift: bool },
     ScrollDiff(DiffScrollAction),
 }
 
@@ -122,14 +123,57 @@ pub fn handle_shortcuts(
             }
         }
 
+        // Space in changed-files pane: toggle current file in multi-selection (ctrl-click behavior).
+        if current_pane == PANE_CHANGED_FILES {
+            if let Some(path) = repo.changed_files.as_ref().and_then(|f| f.selected_file.clone()) {
+                if ui.input(|i| i.key_pressed(egui::Key::Space)) {
+                    return (
+                        KeyboardAction::SelectFileWithModifiers {
+                            path,
+                            ctrl: true,
+                            shift: false,
+                        },
+                        current_pane,
+                    );
+                }
+            }
+        }
+
         // Up/Down to navigate selected item in active pane.
+        // Shift+Down/Up in changed-files pane extends the selection (like shift+click).
         if ui.input(|i| i.key_pressed(egui::Key::ArrowDown)) {
+            if current_pane == PANE_CHANGED_FILES && ui.input(|i| i.modifiers.shift) {
+                if let Some(path) = next_file(repo, true) {
+                    return (
+                        KeyboardAction::SelectFileWithModifiers {
+                            path,
+                            ctrl: false,
+                            shift: true,
+                        },
+                        current_pane,
+                    );
+                }
+                return (KeyboardAction::None, current_pane);
+            }
             return navigate_down(current_pane, repo)
                 .map_or((KeyboardAction::None, current_pane), |action| {
                     (action, current_pane)
                 });
         }
         if ui.input(|i| i.key_pressed(egui::Key::ArrowUp)) {
+            if current_pane == PANE_CHANGED_FILES && ui.input(|i| i.modifiers.shift) {
+                if let Some(path) = next_file(repo, false) {
+                    return (
+                        KeyboardAction::SelectFileWithModifiers {
+                            path,
+                            ctrl: false,
+                            shift: true,
+                        },
+                        current_pane,
+                    );
+                }
+                return (KeyboardAction::None, current_pane);
+            }
             return navigate_up(current_pane, repo)
                 .map_or((KeyboardAction::None, current_pane), |action| {
                     (action, current_pane)
@@ -178,7 +222,10 @@ pub fn action_to_message(action: KeyboardAction) -> Option<AppMessage> {
         KeyboardAction::RefreshRepo => Some(AppMessage::RefreshRepo),
         KeyboardAction::ToggleHelp => None, // Handled in main app state
         KeyboardAction::SelectCommit(hash) => Some(AppMessage::CommitSelected(hash)),
-        KeyboardAction::SelectFile(path) => Some(AppMessage::ChangedFileSelected(path)),
+        KeyboardAction::NavigateFile(path) => Some(AppMessage::NavigateChangedFile(path)),
+        KeyboardAction::SelectFileWithModifiers { path, ctrl, shift } => {
+            Some(AppMessage::SelectFileWithModifiers { path, ctrl, shift })
+        }
         KeyboardAction::ScrollDiff(_) => None,
     }
 }
@@ -186,7 +233,7 @@ pub fn action_to_message(action: KeyboardAction) -> Option<AppMessage> {
 fn navigate_down(current_pane: usize, repo: &RepoState) -> Option<KeyboardAction> {
     match current_pane {
         PANE_COMMIT_HISTORY => next_commit(repo, true).map(KeyboardAction::SelectCommit),
-        PANE_CHANGED_FILES => next_file(repo, true).map(KeyboardAction::SelectFile),
+        PANE_CHANGED_FILES => next_file(repo, true).map(KeyboardAction::NavigateFile),
         PANE_BRANCHES | _ => None,
     }
 }
@@ -194,7 +241,7 @@ fn navigate_down(current_pane: usize, repo: &RepoState) -> Option<KeyboardAction
 fn navigate_up(current_pane: usize, repo: &RepoState) -> Option<KeyboardAction> {
     match current_pane {
         PANE_COMMIT_HISTORY => next_commit(repo, false).map(KeyboardAction::SelectCommit),
-        PANE_CHANGED_FILES => next_file(repo, false).map(KeyboardAction::SelectFile),
+        PANE_CHANGED_FILES => next_file(repo, false).map(KeyboardAction::NavigateFile),
         PANE_BRANCHES | _ => None,
     }
 }

@@ -167,8 +167,11 @@ pub enum AppMessage {
     /// Changed files were loaded.
     ChangedFilesLoaded(ChangedFilesState),
 
-    /// User selected a changed file.
+    /// User selected a changed file (clears multi-selection).
     ChangedFileSelected(PathBuf),
+
+    /// Keyboard navigation to a changed file (preserves multi-selection).
+    NavigateChangedFile(PathBuf),
 
     /// User selected a file with modifiers (Ctrl/Shift).
     SelectFileWithModifiers {
@@ -182,6 +185,12 @@ pub enum AppMessage {
 
     /// User requested to unstage all selected files.
     UnstageSelectedFilesRequested,
+
+    /// User requested to stage a specific explicit set of files.
+    StageSpecificFilesRequested(Vec<PathBuf>),
+
+    /// User requested to unstage a specific explicit set of files.
+    UnstageSpecificFilesRequested(Vec<PathBuf>),
 
     /// User requested to view file content.
     FileContentRequested(PathBuf),

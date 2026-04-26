@@ -62,9 +62,12 @@ pub fn reduce(state: &mut AppState, msg: AppMessage) -> Effect {
         m @ (AppMessage::LoadChangedFilesRequested
         | AppMessage::ChangedFilesLoaded(_)
         | AppMessage::ChangedFileSelected(_)
+        | AppMessage::NavigateChangedFile(_)
         | AppMessage::SelectFileWithModifiers { .. }
         | AppMessage::StageSelectedFilesRequested
         | AppMessage::UnstageSelectedFilesRequested
+        | AppMessage::StageSpecificFilesRequested(_)
+        | AppMessage::UnstageSpecificFilesRequested(_)
         | AppMessage::FileContentRequested(_)
         | AppMessage::FileContentLoaded { .. }
         | AppMessage::FileDiffRequested(_)

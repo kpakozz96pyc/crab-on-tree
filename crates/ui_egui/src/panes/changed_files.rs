@@ -18,6 +18,8 @@ pub enum ChangedFilesAction {
     },
     StageSelectedFiles,
     UnstageSelectedFiles,
+    StageSpecificFiles(Vec<PathBuf>),
+    UnstageSpecificFiles(Vec<PathBuf>),
     CommitSummaryUpdated(String),
     CommitDescriptionUpdated(String),
     AmendLastCommitToggled(bool),
@@ -90,17 +92,32 @@ fn render_section(
 
                 if show_context_menu {
                     let path = file.path.clone();
+                    let is_staged = file.is_staged;
+
+                    // Effective set: clicked file + all currently selected files.
+                    let mut effective: Vec<PathBuf> =
+                        selected_files.iter().cloned().collect();
+                    if !effective.contains(&path) {
+                        effective.push(path.clone());
+                    }
+
                     row_response.context_menu(|ui| {
-                        if ui.button("Revert Changes").clicked() {
-                            *action = ChangedFilesAction::RevertFile(path.clone());
-                            ui.close_menu();
-                        }
-                        if ui.button("Stage File").clicked() {
-                            *action = ChangedFilesAction::ToggleStage {
-                                path: path.clone(),
-                                is_staged: false,
-                            };
-                            ui.close_menu();
+                        if is_staged {
+                            if ui.button("Unstage").clicked() {
+                                *action =
+                                    ChangedFilesAction::UnstageSpecificFiles(effective.clone());
+                                ui.close_menu();
+                            }
+                        } else {
+                            if ui.button("Revert Changes").clicked() {
+                                *action = ChangedFilesAction::RevertFile(path.clone());
+                                ui.close_menu();
+                            }
+                            if ui.button("Stage").clicked() {
+                                *action =
+                                    ChangedFilesAction::StageSpecificFiles(effective.clone());
+                                ui.close_menu();
+                            }
                         }
                         ui.separator();
                         if ui.button("Open in External Editor").clicked() {
@@ -132,21 +149,27 @@ pub fn render(
     let mut list_action = ChangedFilesAction::None;
     let mut panel_action = ChangedFilesAction::None;
 
-    // Handle Enter key for staging/unstaging selected files
-    if !is_commit_view
-        && ui.input(|i| i.key_pressed(egui::Key::Enter))
-        && !files.selected_files.is_empty()
-    {
-        let has_unstaged = files.selected_files.iter().any(|path| {
-            files.unstaged.iter().any(|f| &f.path == path)
-                || files.untracked.iter().any(|f| &f.path == path)
-        });
-
-        keyboard_action = if has_unstaged {
-            ChangedFilesAction::StageSelectedFiles
-        } else {
-            ChangedFilesAction::UnstageSelectedFiles
-        };
+    // Handle Enter key for staging/unstaging selected files.
+    // If selected_files is non-empty, stage/unstage the whole selection.
+    // Otherwise fall back to selected_file (cursor-only navigation case).
+    if !is_commit_view && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+        if !files.selected_files.is_empty() {
+            let has_unstaged = files.selected_files.iter().any(|path| {
+                files.unstaged.iter().any(|f| &f.path == path)
+                    || files.untracked.iter().any(|f| &f.path == path)
+            });
+            keyboard_action = if has_unstaged {
+                ChangedFilesAction::StageSelectedFiles
+            } else {
+                ChangedFilesAction::UnstageSelectedFiles
+            };
+        } else if let Some(path) = &files.selected_file {
+            let is_staged = files.staged.iter().any(|f| &f.path == path);
+            keyboard_action = ChangedFilesAction::ToggleStage {
+                path: path.clone(),
+                is_staged,
+            };
+        }
     }
 
     render_with_bottom_panel(
@@ -164,7 +187,7 @@ pub fn render(
                         &files.selected_files,
                         files.selected_file.as_ref(),
                         is_commit_view,
-                        false,
+                        !is_commit_view,
                         &mut list_action,
                         is_focused,
                     );
@@ -179,7 +202,7 @@ pub fn render(
                         &files.selected_files,
                         files.selected_file.as_ref(),
                         is_commit_view,
-                        !is_commit_view, // context menu only in working dir view
+                        !is_commit_view,
                         &mut list_action,
                         is_focused,
                     );
@@ -194,7 +217,7 @@ pub fn render(
                         &files.selected_files,
                         files.selected_file.as_ref(),
                         is_commit_view,
-                        false,
+                        !is_commit_view,
                         &mut list_action,
                         is_focused,
                     );
@@ -359,6 +382,12 @@ pub fn action_to_message(action: ChangedFilesAction) -> Option<AppMessage> {
         }
         ChangedFilesAction::StageSelectedFiles => Some(AppMessage::StageSelectedFilesRequested),
         ChangedFilesAction::UnstageSelectedFiles => Some(AppMessage::UnstageSelectedFilesRequested),
+        ChangedFilesAction::StageSpecificFiles(paths) => {
+            Some(AppMessage::StageSpecificFilesRequested(paths))
+        }
+        ChangedFilesAction::UnstageSpecificFiles(paths) => {
+            Some(AppMessage::UnstageSpecificFilesRequested(paths))
+        }
         ChangedFilesAction::CommitSummaryUpdated(summary) => {
             Some(AppMessage::CommitSummaryUpdated(summary))
         }

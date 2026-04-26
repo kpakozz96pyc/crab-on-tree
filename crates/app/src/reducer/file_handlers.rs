@@ -24,6 +24,28 @@ pub(super) fn handle(state: &mut AppState, msg: AppMessage) -> Effect {
                     changed_files.commit_description = old_files.commit_description.clone();
                     changed_files.amend_last_commit = old_files.amend_last_commit;
                     changed_files.push_after_commit = old_files.push_after_commit;
+
+                    // Restore cursor if the file still exists in the new list.
+                    if let Some(ref path) = old_files.selected_file {
+                        if path_exists_in_files(&changed_files, path) {
+                            changed_files.selected_file = old_files.selected_file.clone();
+                        }
+                    }
+
+                    // Restore anchor for shift-selection if it still exists.
+                    if let Some(ref path) = old_files.last_clicked_file {
+                        if path_exists_in_files(&changed_files, path) {
+                            changed_files.last_clicked_file = old_files.last_clicked_file.clone();
+                        }
+                    }
+
+                    // Restore multi-selection, keeping only paths that still exist.
+                    changed_files.selected_files = old_files
+                        .selected_files
+                        .iter()
+                        .filter(|p| path_exists_in_files(&changed_files, p))
+                        .cloned()
+                        .collect();
                 } else if !changed_files.is_commit_view {
                     let repo_key = repo.path.to_string_lossy().to_string();
                     if let Some(draft) = state.config.commit_drafts.get(&repo_key) {
@@ -35,6 +57,57 @@ pub(super) fn handle(state: &mut AppState, msg: AppMessage) -> Effect {
                 tracing::info!("Loaded changed files");
             }
             Effect::None
+        }
+
+        AppMessage::NavigateChangedFile(path) => {
+            if let Some(repo) = &mut state.current_repo {
+                if let Some(files) = &mut repo.changed_files {
+                    files.selected_file = Some(path.clone());
+                    files.last_clicked_file = Some(path.clone());
+                    // selected_files intentionally not cleared
+                }
+
+                let is_viewing_commit = repo
+                    .selected_commit
+                    .as_ref()
+                    .map(|hash| hash != crate::WORKING_DIR_HASH)
+                    .unwrap_or(false);
+
+                if is_viewing_commit {
+                    if let Some(commit_diff) = &repo.commit_diff {
+                        let path_str = path.to_string_lossy();
+                        if let Some(file_diff) = commit_diff.iter().find(|fd| fd.path == path_str) {
+                            repo.file_view = crate::state::FileViewState::Diff {
+                                path: path.clone(),
+                                hunks: file_diff.hunks.clone(),
+                                view_mode: crate::state::DiffViewMode::Unified,
+                            };
+                        }
+                    }
+                    Effect::None
+                } else {
+                    let is_untracked = repo
+                        .changed_files
+                        .as_ref()
+                        .map(|files| files.untracked.iter().any(|f| f.path == path))
+                        .unwrap_or(false);
+
+                    state.loading = true;
+                    if is_untracked {
+                        Effect::LoadFileContent {
+                            repo_path: repo.path.clone(),
+                            file_path: path,
+                        }
+                    } else {
+                        Effect::LoadFileDiff {
+                            repo_path: repo.path.clone(),
+                            file_path: path,
+                        }
+                    }
+                }
+            } else {
+                Effect::None
+            }
         }
 
         AppMessage::ChangedFileSelected(path) => {
@@ -205,6 +278,47 @@ pub(super) fn handle(state: &mut AppState, msg: AppMessage) -> Effect {
             Effect::None
         }
 
+        AppMessage::StageSpecificFilesRequested(paths) => {
+            if let Some(repo) = &state.current_repo {
+                if let Some(files) = &repo.changed_files {
+                    let to_stage: Vec<std::path::PathBuf> = paths
+                        .into_iter()
+                        .filter(|p| {
+                            files.unstaged.iter().any(|f| &f.path == p)
+                                || files.untracked.iter().any(|f| &f.path == p)
+                        })
+                        .collect();
+                    if !to_stage.is_empty() {
+                        state.loading = true;
+                        return Effect::StageFiles {
+                            repo_path: repo.path.clone(),
+                            file_paths: to_stage,
+                        };
+                    }
+                }
+            }
+            Effect::None
+        }
+
+        AppMessage::UnstageSpecificFilesRequested(paths) => {
+            if let Some(repo) = &state.current_repo {
+                if let Some(files) = &repo.changed_files {
+                    let to_unstage: Vec<std::path::PathBuf> = paths
+                        .into_iter()
+                        .filter(|p| files.staged.iter().any(|f| &f.path == p))
+                        .collect();
+                    if !to_unstage.is_empty() {
+                        state.loading = true;
+                        return Effect::UnstageFiles {
+                            repo_path: repo.path.clone(),
+                            file_paths: to_unstage,
+                        };
+                    }
+                }
+            }
+            Effect::None
+        }
+
         AppMessage::FileContentRequested(path) => {
             if let Some(repo) = &state.current_repo {
                 state.loading = true;
@@ -345,4 +459,11 @@ pub(super) fn handle(state: &mut AppState, msg: AppMessage) -> Effect {
 
         _ => unreachable!("file_handlers received unexpected message"),
     }
+}
+
+fn path_exists_in_files(files: &crate::ChangedFilesState, path: &std::path::PathBuf) -> bool {
+    files.staged.iter().any(|f| &f.path == path)
+        || files.unstaged.iter().any(|f| &f.path == path)
+        || files.untracked.iter().any(|f| &f.path == path)
+        || files.conflicted.iter().any(|f| &f.path == path)
 }
