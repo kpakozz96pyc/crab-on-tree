@@ -42,10 +42,8 @@ impl CrabOnTreeApp {
 
     fn render_dock_layout(&mut self, ui: &mut egui::Ui) {
         let visible_panes = self.get_visible_panes();
-        let mut visible_indices: Vec<usize> =
+        let visible_indices: Vec<usize> =
             visible_panes.iter().map(|p| pane_to_index(*p)).collect();
-        visible_indices.sort_unstable();
-        visible_indices.dedup();
 
         if !visible_indices.contains(&self.active_pane) {
             if let Some(first_visible) = visible_indices.first().copied() {
